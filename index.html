@@ -124,8 +124,8 @@ td input[type=text]{width:100%}
 .coordwrap>div{min-height:0;overflow:auto}
 .sec{display:flex;flex-direction:column;gap:6px;margin-bottom:16px}
 .sec h4{margin:0;font-size:11px;color:#7a8090;font-weight:500;border-bottom:1px solid var(--line);padding-bottom:4px}
-.sec .row label{flex:1 1 70px}
-.sec .row select,.sec .row input[type=number]{flex:1 1 70px;width:auto}
+.coordwrap .sec .row label{flex:1 1 70px}
+.coordwrap .sec .row select,.coordwrap .sec .row input[type=number]{flex:1 1 70px;width:auto}
 #cgrid{position:relative;display:grid;grid-template-columns:repeat(var(--cols),var(--cell));grid-auto-rows:var(--cell);gap:1px}
 .c{padding:0;border:0;border-radius:3px;font:600 calc(var(--cell)*.42)/1 ui-monospace,Consolas,monospace;color:#2b2d3a;display:flex;align-items:center;justify-content:center;overflow:hidden;opacity:var(--cell-op);user-select:none;-webkit-user-select:none;touch-action:manipulation}
 .c.blk{background:#f6b8b8} button.c{cursor:pointer}
@@ -197,7 +197,7 @@ const TEXTCOL=['#2b2f3a','#2f7fb5','#d6557a','#3f9a63','#4aa3d0','#8a63c9','#b07
 const TEXTCOLNAME=['기본','파랑','분홍','초록','하늘','보라','노랑','회색'];
 const MOODS=['','좋음','보통','나쁨'];
 const STATUS={draft:'초안',review:'검수 필요',final:'확정'};
-const FX={affinity:'호감도',flag:'플래그',item:'아이템 해금',recipe:'레시피 해금'};
+const FX={affinity:'호감도',item:'아이템 해금',recipe:'레시피 해금'};
 const MONTHS=[[6,30],[7,31],[8,31]], SPECIAL=['4-5','4-14'];
 const ALLDATES=[...SPECIAL,...MONTHS.flatMap(([m,n])=>Array.from({length:n},(_,i)=>m+'-'+(i+1)))];
 const dl=k=>{const [m,d]=k.split('-');return m+'월 '+d+'일';};
@@ -205,21 +205,20 @@ const LS='merongtool.autosave', LSF='merongtool.font';
 let FONT='"Galmuri9","Galmuri11","DungGeunMo","NeoDunggeunmo","Neo둥근모","DOSGothic","Malgun Gothic",sans-serif'; // 미리보기(게임 화면) 전용 폰트
 
 let db=null, undoSnap=null, saveT=null;
-const ui={tool:'dialog',tab:'edit',dlg:null,line:0,date:null,dateOnly:true,q:'',fNpc:'',fStatus:'',fFlag:'',dbTab:'npcs',flowNpc:'',coordNpc:''};
+const ui={tool:'dialog',tab:'edit',dlg:null,line:0,date:null,dateOnly:true,q:'',fNpc:'',fStatus:'',fFlag:'',dbTab:'normal',pvOpen:false,flowNpc:'',coordNpc:''};
 
 function blankDB(sample){
-  const d={app:'merongtool',version:1,name:'새 프로젝트',npcs:[],flags:[],tables:[],dialogs:[],coord:freshCoord(),
-    preview:{v:2,w:480,rows:3,font:20,lineH:28,pad:14,scale:1,speed:40,portrait:true,pw:96,pixel:true}};
+  const d={app:'merongtool',version:1,name:'새 프로젝트',npcs:[],tables:[],dialogs:[],coord:freshCoord(),
+    preview:{v:2,w:480,rows:3,font:20,lineH:28,pad:14,scale:1,speed:40,pixel:true,bubbleImg:'',standImg:'',stands:{},standBack:false,sx:'',sy:'',tx:'',ty:'',tw:'',showName:true,nx:'',ny:''}};
   if(sample){
     d.name='예시 프로젝트';
-    d.npcs=[{id:'npc_moss',name:'모스',color:'#8fc9a3',faces:'기본, 웃음, 당황'},{id:'npc_luna',name:'루나',color:'#8fd0ee',faces:'기본, 졸림'}];
+    d.npcs=[{id:'npc_moss',name:'모스',color:'#8fc9a3',faces:'기본, 웃음, 당황'},{id:'npc_luna',name:'루나',color:'#8fd0ee',faces:'기본, 졸림',kind:'special'},{id:'band_rio',name:'리오',color:'#f9c0dc',faces:'기본',kind:'band'}];
     d.tables=[{name:'음료 (예시)',kind:'recipe',cols:['ID','CodeName','Name','판매가격','재료1 ID','재료2 ID','재료3 ID','재료4 ID','음료감정1','음료감정2','음료제한시간'],rows:[['1','moss_latte','이끼 라떼','1200','1','2','','','포근함','','30']]},
       {name:'아이템 (예시)',kind:'item',cols:['ID','CodeName','Name','맥스스택','몇번사용가능','물류업자에게 구매하는 가격'],rows:[['1','unknown_seed','이름 모를 씨앗','99','1','300']]}];
-    d.flags=[{id:'met_moss',desc:'모스를 처음 만남'}];
     d.dialogs=[
       {id:'moss_visit1',title:'첫 방문',npc:'npc_moss',status:'review',entry:'cond',seq:3,
        cond:{visit:1,affMin:'',affMax:'',mood:'',dates:[],flags:[]},
-       lines:[{n:1,speaker:'npc_moss',face:'기본',text:'어서 와, \\C[2]멜로\\C[0].\\| 여기 처음이지?',memo:'',effects:[{type:'flag',target:'met_moss',value:true}],choices:[]},
+       lines:[{n:1,speaker:'npc_moss',face:'기본',text:'어서 와, \\C[2]멜로\\C[0].\\| 여기 처음이지?',memo:'',effects:[],choices:[]},
               {n:2,speaker:'npc_moss',face:'웃음',text:'오늘은 \\{이끼 라떼\\} 한 잔 부탁해도 될까?',memo:'여기서 주문 UI 연출',effects:[],
                choices:[{text:'금방 만들어 줄게!',next:'moss_visit1_yes',effects:[{type:'affinity',target:'npc_moss',value:2}]},{text:'그게 뭔데…?',next:'moss_visit1_what',effects:[]}]}]},
       {id:'moss_visit1_yes',title:'첫 방문 - 수락',npc:'npc_moss',status:'draft',entry:'link',seq:2,cond:{visit:'',affMin:'',affMax:'',mood:'',dates:[],flags:[]},
@@ -235,14 +234,14 @@ function normalize(d){ // 오래된 세이브·빠진 필드 보정
   const b=blankDB(false);
   for(const k in b) if(d[k]==null) d[k]=b[k];
   for(const [k,nm,kind] of [['items','아이템','item'],['recipes','레시피','recipe']]){ if(Array.isArray(d[k])&&d[k].length)d.tables.push({name:nm,kind,cols:['ID','Name','설명'],rows:d[k].map(r=>[r.id,r.name||'',r.desc||''])}); delete d[k]; }
-  delete d.vars;
+  delete d.vars; delete d.flags; for(const n of d.npcs)n.kind=n.kind||'normal';
   d.preview=d.preview&&d.preview.v===2?Object.assign(b.preview,d.preview):b.preview; delete d.coords; delete d.map; d.coord=Object.assign(b.coord,d.coord);
   for(const g of d.dialogs){ g.cond=Object.assign({visit:'',affMin:'',affMax:'',mood:'',dates:[],flags:[]},g.cond); g.lines=g.lines||[]; g.entry=g.entry||'cond'; g.status=g.status||'draft';
     g.seq=g.seq||g.lines.length+1;
-    for(const l of g.lines){ l.effects=l.effects||[]; l.choices=l.choices||[]; l.memo=l.memo||''; if(!l.n)l.n=g.seq++; for(const c of l.choices)c.effects=c.effects||[]; } }
+    for(const l of g.lines){ l.effects=(l.effects||[]).filter(f=>f.type!=='flag'); for(const c of l.choices||[])c.effects=(c.effects||[]).filter(f=>f.type!=='flag'); l.choices=l.choices||[]; l.memo=l.memo||''; if(!l.n)l.n=g.seq++; for(const c of l.choices)c.effects=c.effects||[]; } }
   return d;
 }
-function touch(){ clearTimeout(saveT); saveT=setTimeout(()=>{ try{localStorage.setItem(LS,JSON.stringify({t:Date.now(),db}));}catch(e){ try{localStorage.setItem(LS,JSON.stringify({t:Date.now(),db:Object.assign({},db,{coord:Object.assign({},db.coord,{bg:null})})}));}catch(e2){} } const s=$('#saved'); if(s)s.textContent='자동 저장됨 '+new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}); },500); }
+function touch(){ clearTimeout(saveT); saveT=setTimeout(()=>{ try{localStorage.setItem(LS,JSON.stringify({t:Date.now(),db}));}catch(e){ try{localStorage.setItem(LS,JSON.stringify({t:Date.now(),db:Object.assign({},db,{coord:Object.assign({},db.coord,{bg:null}),preview:Object.assign({},db.preview,{bubbleImg:'',standImg:'',stands:{}})})}));touch.lite=true;}catch(e2){} } const s=$('#saved'); if(s)s.textContent=(touch.lite?'자동 저장됨 (이미지는 용량 때문에 제외 · 세이브 저장에는 포함) ':'자동 저장됨 ')+new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}); },500); }
 function snap(){ undoSnap=JSON.stringify(db); }
 function toast(msg,undo){ const t=$('#toast'); put(t,msg, undo&&undoSnap? h('button',{class:'sm',onclick:()=>{db=JSON.parse(undoSnap);undoSnap=null;touch();render();t.style.display='none';}},'되돌리기'):null);
   t.style.display='flex'; clearTimeout(toast.t); toast.t=setTimeout(()=>t.style.display='none',undo?6000:2600); }
@@ -319,8 +318,8 @@ function renderCal(){
 }
 
 /* ---------- 데이터베이스 ---------- */
-const DBT={npcs:['손님(NPC)',[['id','ID'],['name','이름'],['color','색','color'],['faces','표정 목록 (쉼표로 구분)']],()=>({id:'npc_new',name:'',color:'#8fd0ee',faces:'기본'})],
-  flags:['플래그',[['id','ID'],['desc','설명']],()=>({id:'flag_new',desc:''})]};
+const NK=[['normal','손님(NPC)'],['special','특별손님'],['band','밴드멤버'],['talk','대사만 있는 손님']];
+const NCOLS=[['id','ID'],['name','이름'],['color','색','color'],['faces','표정 목록 (쉼표로 구분)']];
 const toCSV=rows=>rows.map(r=>r.map(s=>'"'+String(s??'').replace(/"/g,'""')+'"').join(',')).join('\r\n');
 function tableRows(kind){ const out=[];
   for(const t of db.tables){ if(t.kind!==kind)continue; const lc=t.cols.map(c=>String(c).trim().toLowerCase()); let ii=lc.indexOf('id'); if(ii<0)ii=0; let ni=lc.indexOf('name'); if(ni<0)ni=lc.indexOf('codename');
@@ -346,9 +345,9 @@ function tableView(ti){
       h('span',{class:'muted grow'},t.rows.length+'행 × '+t.cols.length+'열'),
       h('button',{class:'sm',onclick:()=>importCSV(ti)},'CSV 다시 불러오기'),
       h('button',{class:'sm',onclick:()=>saveFile((t.name||'table')+'.csv','﻿'+toCSV([t.cols,...t.rows]))},'CSV 내보내기'),
-      h('button',{class:'sm pk',onclick:()=>{snap();db.tables.splice(ti,1);ui.dbTab='npcs';touch();render();toast('표를 삭제했어요',true);}},'표 삭제')),
+      h('button',{class:'sm pk',onclick:()=>{snap();db.tables.splice(ti,1);ui.dbTab='normal';touch();render();toast('표를 삭제했어요',true);}},'표 삭제')),
     h('div',{class:'gridwrap','data-sc':'tbl'},h('table',{class:'grid'},
-      h('tr',{},h('th',{},'#'),t.cols.map((c,ci)=>h('th',{},colIn(ci))),h('th',{},'')),
+      h('tr',{},h('th',{},'#'),t.cols.map((c,ci)=>h('th',{},h('div',{style:'display:flex;align-items:center'},colIn(ci),h('button',{class:'sm ghost',title:'열 삭제',onclick:()=>{snap();t.cols.splice(ci,1);t.rows.forEach(r=>r.splice(ci,1));touch();render();toast('열을 삭제했어요',true);}},'✕')))),h('th',{},'')),
       t.rows.map((r,ri)=>h('tr',{},h('td',{class:'muted',style:'padding:0 6px'},ri+1),t.cols.map((c,ci)=>h('td',{},cell(r,ci))),
         h('td',{},h('button',{class:'sm ghost',title:'행 삭제',onclick:()=>{snap();t.rows.splice(ri,1);touch();render();toast('행을 삭제했어요',true);}},'✕')))))),
     h('div',{class:'row',style:'margin-top:8px'},h('button',{class:'pri sm',onclick:()=>{t.rows.push(t.cols.map(()=>''));touch();render();}},'+ 행 추가'),
@@ -356,21 +355,25 @@ function tableView(ti){
       h('span',{class:'muted'},'CSV의 열과 값을 그대로 보관해요. 용도를 정하면 ID 열과 Name 열을 읽어 대화 효과의 드롭다운에 씁니다.')));
 }
 function dbView(){
-  if(/^t\d+$/.test(ui.dbTab)&&!db.tables[+ui.dbTab.slice(1)])ui.dbTab='npcs';
+  const isT=()=>/^t\d+$/.test(ui.dbTab);
+  if(!NK.some(k=>k[0]===ui.dbTab)&&!(isT()&&db.tables[+ui.dbTab.slice(1)]))ui.dbTab='normal';
+  const kindOf=n=>n.kind||'normal';
   const tab=(k,l,n)=>h('button',{class:ui.dbTab===k?'on':'',onclick:()=>{ui.dbTab=k;render();}},l,h('span',{class:'muted'},' '+n));
-  const tabs=h('div',{class:'row',style:'margin-bottom:10px'},h('div',{class:'tabs',style:'margin-bottom:0'},Object.keys(DBT).map(k=>tab(k,DBT[k][0],db[k].length)),db.tables.map((t,i)=>tab('t'+i,t.name||'이름 없는 표',t.rows.length))),
+  const tabs=h('div',{class:'row',style:'margin-bottom:10px'},h('div',{class:'tabs',style:'margin-bottom:0'},NK.map(([k,l])=>tab(k,l,db.npcs.filter(n=>kindOf(n)===k).length)),db.tables.map((t,i)=>tab('t'+i,t.name||'이름 없는 표',t.rows.length))),
     h('button',{class:'pri',onclick:()=>importCSV()},'+ CSV 불러오기'));
-  if(ui.dbTab[0]==='t')return h('div',{},tabs,tableView(+ui.dbTab.slice(1)));
-  const [,cols,mk]=DBT[ui.dbTab], rows=db[ui.dbTab];
-  const ids=rows.map(r=>r.id), dup=new Set(ids.filter((x,i)=>ids.indexOf(x)!==i));
+  if(isT())return h('div',{},tabs,tableView(+ui.dbTab.slice(1)));
+  const rows=db.npcs.filter(n=>kindOf(n)===ui.dbTab), ids=db.npcs.map(r=>r.id), dup=new Set(ids.filter((x,i)=>ids.indexOf(x)!==i));
+  const pre={normal:'npc',special:'special',band:'band',talk:'talk'}[ui.dbTab];
   return h('div',{},tabs,
     h('div',{class:'panel'},
-      h('table',{},h('tr',{},cols.map(c=>h('th',{},c[1])),h('th',{style:'width:40px'},'')),
-        rows.map((r,i)=>h('tr',{},cols.map(c=>h('td',{style:c[0]==='id'&&dup.has(r.id)?'background:var(--pinkl)':''},inp(r,c[0],{type:c[2]||'text',rerender:c[0]==='id'}))),
-          h('td',{},h('button',{class:'sm ghost',title:'삭제',onclick:()=>{snap();rows.splice(i,1);touch();render();toast('삭제했어요',true);}},'✕'))))),
-      h('div',{class:'row',style:'margin-top:8px'},h('button',{class:'pri',onclick:()=>{rows.push(mk());touch();render();}},'+ 추가'),
-        dup.size?h('span',{class:'tag pk'},'겹치는 ID가 있어요'):null,
-        h('span',{class:'muted'},'ID를 바꾸면 그 ID를 쓰던 대화는 자동으로 따라오지 않아요. 대화 툴의 검증 탭에서 잡아줍니다.'))));
+      h('table',{},h('tr',{},NCOLS.map(c=>h('th',{},c[1])),h('th',{style:'width:150px'},'분류'),h('th',{style:'width:40px'},'')),
+        rows.map(r=>h('tr',{},NCOLS.map(c=>h('td',{style:c[0]==='id'&&dup.has(r.id)?'background:var(--pinkl)':''},inp(r,c[0],{type:c[2]||'text',rerender:c[0]==='id'}))),
+          h('td',{},sel(NK,kindOf(r),v=>r.kind=v)),
+          h('td',{},h('button',{class:'sm ghost',title:'삭제',onclick:()=>{snap();db.npcs.splice(db.npcs.indexOf(r),1);touch();render();toast('삭제했어요',true);}},'✕'))))),
+      rows.length?null:h('p',{class:'muted'},'아직 없어요.'),
+      h('div',{class:'row',style:'margin-top:8px'},h('button',{class:'pri',onclick:()=>{db.npcs.push({id:pre+'_new',name:'',color:'#8fd0ee',faces:'기본',kind:ui.dbTab});touch();render();}},'+ 추가'),
+        dup.size?h('span',{class:'tag pk'},'겹치는 ID가 있어요 (분류가 달라도 ID는 하나씩)'):null,
+        h('span',{class:'muted'},'네 분류 모두 대화 툴의 손님·화자 드롭다운에 나와요. ID를 바꾸면 그 ID를 쓰던 대화는 검증 탭에서 잡아줍니다.'))));
 }
 
 /* ---------- 좌표 설정 툴 (NPC 좌표 설정기 이식, 캘린더 부분 제외) ---------- */
@@ -532,7 +535,6 @@ function newDialog(base){
 function openDlg(id,line){ ui.tool='dialog'; ui.tab='edit'; ui.dlg=id; ui.line=line||0; ui.q='';ui.fNpc='';ui.fStatus='';ui.fFlag=''; render(); }
 function dlgMatches(d){
   if(ui.fNpc&&d.npc!==ui.fNpc)return false; if(ui.fStatus&&d.status!==ui.fStatus)return false;
-  if(ui.fFlag&&!(d.lines.some(l=>[...l.effects,...l.choices.flatMap(c=>c.effects)].some(f=>f.type==='flag'&&f.target===ui.fFlag))))return false;
   if(ui.q){ const q=ui.q.toLowerCase(); if(!(d.id+' '+d.title+' '+d.lines.map(l=>l.text+' '+l.memo+' '+l.choices.map(c=>c.text).join(' ')).join(' ')).toLowerCase().includes(q))return false; }
   return true;
 }
@@ -559,17 +561,15 @@ function listCol(){
     q,
     h('div',{class:'row',style:'margin:6px 0'},
       sel([['','손님 전체'],...db.npcs.map(n=>[n.id,n.name||n.id])],ui.fNpc,v=>ui.fNpc=v,'flex:1'),
-      sel([['','상태 전체'],...Object.entries(STATUS)],ui.fStatus,v=>ui.fStatus=v,'flex:1'),
-      sel([['','플래그 전체'],...db.flags.map(f=>f.id)],ui.fFlag,v=>ui.fFlag=v,'width:100%')),
+      sel([['','상태 전체'],...Object.entries(STATUS)],ui.fStatus,v=>ui.fStatus=v,'flex:1')),
     box);
 }
 function fxEditor(arr){
   return h('div',{class:'sub2'},arr.map((f,i)=>h('div',{class:'row'},h('span',{class:'tag sky'},'효과'),
       sel(Object.entries(FX),f.type,v=>{f.type=v;f.target='';f.value=v==='flag'?true:(v==='affinity'?1:1);}),
       f.type==='affinity'?sel(db.npcs.map(n=>[n.id,n.name||n.id]),f.target,v=>f.target=v):
-      f.type==='flag'?sel(db.flags.map(x=>x.id),f.target,v=>f.target=v):
       f.type==='item'?sel(tableRows('item').map(x=>[x.id,x.name+' ('+x.id+')']),f.target,v=>f.target=v):sel(tableRows('recipe').map(x=>[x.id,x.name+' ('+x.id+')']),f.target,v=>f.target=v),
-      f.type==='affinity'?inp(f,'value',{type:'number',title:'더할 값 (음수 가능)'}):f.type==='flag'?sel([['true','켜기'],['false','끄기']],String(f.value),v=>f.value=v==='true'):null,
+      f.type==='affinity'?inp(f,'value',{type:'number',title:'더할 값 (음수 가능)'}):null,
       h('button',{class:'sm',onclick:()=>{arr.splice(i,1);touch();render();}},'✕'))),
     h('div',{},h('button',{class:'sm',onclick:()=>{arr.push({type:'affinity',target:'',value:1});touch();render();}},'+ 효과')));
 }
@@ -640,7 +640,19 @@ function parseText(raw){
   return {toks,unknown};
 }
 const mctx=document.createElement('canvas').getContext('2d');
-function textArea(P){ const tx=P.pad+(P.portrait?(+P.pw||96)+P.pad-2:0); return {tx,maxW:P.w-tx-P.pad}; }
+const imgCache={};
+function getImg(url){ if(!url)return null; let im=imgCache[url]; if(!im){ im=imgCache[url]=new Image(); im.onload=()=>{ if(db&&ui.tool==='dialog'&&ui.tab==='edit')render(); }; im.src=url; } return im.complete&&im.naturalWidth?im:null; }
+function standUrl(l){ const P=db.preview, m=P.stands||{}; if(!l)return P.standImg||''; return m[l.speaker+'|'+(l.speaker==='player'?'':(l.face||''))]||P.standImg||''; }
+const nv=(v,d)=>v===''||v==null||isNaN(+v)?d:+v;
+function geo(P,l){ // 말풍선·스탠딩·글자 위치 계산 (모두 실제 px)
+  const bi=getImg(P.bubbleImg), si=getImg(standUrl(l)), nameH=P.font+8;
+  const bw=bi?bi.naturalWidth:Math.max(80,+P.w||480), bh=bi?bi.naturalHeight:nameH+P.pad*2+P.rows*P.lineH;
+  const sw=si?si.naturalWidth:0, sh=si?si.naturalHeight:0;
+  let sx=nv(P.sx,bw), sy=nv(P.sy,bh-sh); const bx=Math.max(0,-sx), by=Math.max(0,-sy); sx+=bx; sy+=by;
+  const txr=nv(P.tx,P.pad), tyr=nv(P.ty,bi?P.pad+(P.showName?P.font+8:0):nameH+P.pad);
+  return {bi,si,bw,bh,bx,by,sx,sy,nameH,W:Math.max(bx+bw,si?sx+sw:0),H:Math.max(by+bh,si?sy+sh:0),tx:bx+txr,ty:by+tyr,maxW:Math.max(10,nv(P.tw,bw-txr-P.pad)),nx:bx+nv(P.nx,P.pad),ny:by+nv(P.ny,P.pad)};
+}
+function textArea(P){ const g=geo(P,null); return {tx:g.tx,maxW:g.maxW}; }
 function layout(toks,P){
   const {maxW}=textArea(P); let size=P.font,color=0,x=0,line=0,wrapped=false; const glyphs=[];
   toks.forEach((t,k)=>{
@@ -671,26 +683,25 @@ function pvClick(){ const d=curDlg(); if(!d)return;
   else if(ui.line<d.lines.length-1){ui.line++;markLine();pvLoad(false);} }
 function markLine(){ document.querySelectorAll('.line').forEach((e,j)=>e.classList.toggle('on',j===ui.line)); const lb=$('#pvlabel'); const d=curDlg(); if(lb&&d)lb.textContent=(d.lines.length?ui.line+1:0)+' / '+d.lines.length+' 줄'; }
 function pvDraw(){
-  const cv=$('#pvc'); if(!cv)return; const P=db.preview, d=curDlg(), l=d&&d.lines[ui.line];
-  const pw=+P.pw||96, nameH=P.font+8, boxH=Math.max(P.pad*2+P.rows*P.lineH,P.portrait?pw+12:0), W=Math.max(80,+P.w||480), H=nameH+boxH;
+  const cv=$('#pvc'); if(!cv)return; const P=db.preview, d=curDlg(), l=d&&d.lines[ui.line], G=geo(P,l), W=G.W, H=G.H;
   cv.width=W; cv.height=H; cv.style.width=W*P.scale+'px'; cv.style.height=H*P.scale+'px';
-  const c=cv.getContext('2d'); c.clearRect(0,0,W,H);
-  c.fillStyle=INK; c.fillRect(0,nameH,W,boxH); c.fillStyle='#fff'; c.fillRect(2,nameH+2,W-4,boxH-4);
-  c.strokeStyle=SKY; c.lineWidth=1; c.strokeRect(3.5,nameH+3.5,W-7,boxH-7);
+  const c=cv.getContext('2d'); c.imageSmoothingEnabled=false; c.clearRect(0,0,W,H);
+  const stand=()=>{ if(G.si)c.drawImage(G.si,G.sx,G.sy); };
+  if(P.standBack)stand();
+  if(G.bi)c.drawImage(G.bi,G.bx,G.by);
+  else{ const y=G.by+G.nameH, bh=G.bh-G.nameH; c.fillStyle=INK; c.fillRect(G.bx,y,G.bw,bh); c.fillStyle='#fff'; c.fillRect(G.bx+2,y+2,G.bw-4,bh-4); c.strokeStyle=SKY; c.lineWidth=1; c.strokeRect(G.bx+3.5,y+3.5,G.bw-7,bh-7); }
+  if(!P.standBack)stand();
   const tcv=document.createElement('canvas'); tcv.width=W; tcv.height=H; const t=tcv.getContext('2d'); t.textBaseline='top';
   if(l){
     const npc=npcOf(l.speaker), col=l.speaker==='player'?'#f4a6ba':(npc?npc.color:'#c9ced6'), name=speakerName(l.speaker);
-    t.font=P.font+'px '+FONT; const nw=Math.ceil(t.measureText(name).width)+12;
-    c.fillStyle=INK; c.fillRect(6,0,nw+4,nameH+2); c.fillStyle=col; c.fillRect(8,2,nw,nameH-2);
-    t.fillStyle=INK; t.fillText(name,14,Math.floor((nameH+2-P.font)/2));
-    if(P.portrait){ const px=P.pad-2, py=nameH+Math.floor((boxH-pw)/2); c.fillStyle=INK; c.fillRect(px,py,pw,pw); c.fillStyle=col; c.fillRect(px+2,py+2,pw-4,pw-4); c.fillStyle='rgba(255,255,255,.55)'; c.fillRect(px+2,py+2,pw-4,pw-4);
-      const fs=Math.max(10,Math.round(P.font/2)); t.font=fs+'px '+FONT; const f=l.speaker==='player'?'':(l.face||''); t.fillStyle=INK; t.fillText(f,px+Math.max(3,Math.floor((pw-t.measureText(f).width)/2)),py+Math.floor(pw/2-fs/2)); }
-    const {tx}=textArea(P);
+    t.font=P.font+'px '+FONT; t.fillStyle=INK;
+    if(G.bi){ if(P.showName)t.fillText(name,G.nx,G.ny); }
+    else{ const nw=Math.ceil(t.measureText(name).width)+12; c.fillStyle=INK; c.fillRect(G.bx+6,G.by,nw+4,G.nameH+2); c.fillStyle=col; c.fillRect(G.bx+8,G.by+2,nw,G.nameH-2); t.fillText(name,G.bx+14,G.by+Math.floor((G.nameH+2-P.font)/2)); }
     for(const g of pv.lay.glyphs){ if(g.k>=pv.shown||g.line>=P.rows)continue; t.font=g.size+'px '+FONT; t.fillStyle=TEXTCOL[g.color];
-      t.fillText(g.c,tx+g.x,nameH+P.pad+g.line*P.lineH+Math.floor((P.lineH-g.size)/2)); }
+      t.fillText(g.c,G.tx+g.x,G.ty+g.line*P.lineH+Math.floor((P.lineH-g.size)/2)); }
     if(P.pixel){ const im=t.getImageData(0,0,W,H), a=im.data; for(let i=3;i<a.length;i+=4)a[i]=a[i]>=112?255:0; t.putImageData(im,0,0); }
-    c.imageSmoothingEnabled=false; c.drawImage(tcv,0,0);
-    if(pv.waiting||(pv.done&&!pv.noWait)){ c.fillStyle='#e0708e'; const z=Math.max(1,Math.round(P.font/10)), ax=W-8-7*z, ay=H-6-6*z; c.fillRect(ax,ay,7*z,2*z); c.fillRect(ax+z,ay+2*z,5*z,2*z); c.fillRect(ax+2*z,ay+4*z,3*z,z); c.fillRect(ax+3*z,ay+5*z,z,z); }
+    c.drawImage(tcv,0,0);
+    if(pv.waiting||(pv.done&&!pv.noWait)){ c.fillStyle='#e0708e'; const z=Math.max(1,Math.round(P.font/10)), ax=G.bx+G.bw-8-7*z, ay=G.by+G.bh-6-6*z; c.fillRect(ax,ay,7*z,2*z); c.fillRect(ax+z,ay+2*z,5*z,2*z); c.fillRect(ax+2*z,ay+4*z,3*z,z); c.fillRect(ax+3*z,ay+5*z,z,z); }
   }
   markLine();
 }
@@ -704,21 +715,37 @@ function pvInfo(){
 function pvChoices(){ const box=$('#pvch'); if(!box)return; const d=curDlg(), l=d&&d.lines[ui.line];
   put(box,...(l?l.choices:[]).map(ch=>h('button',{onclick:()=>{ if(ch.next&&db.dialogs.some(x=>x.id===ch.next)){ui.dlg=ch.next;ui.line=0;render();pvLoad(false);} else toast(ch.next?'연결된 대화가 없어요':'여기서 대화가 끝나요'); }},'▸ '+(ch.text||'(빈 선택지)'),h('span',{class:'muted'},ch.next?'  → '+ch.next:'  (끝)')))); }
 function previewCol(){
-  const P=db.preview, d=curDlg();
+  const P=db.preview, d=curDlg(), l=d&&d.lines[ui.line];
   const cv=h('canvas',{id:'pvc',onclick:pvClick,title:'누르면 다음으로 넘어가요'});
-  const num=(k,l,step)=>h('label',{class:'f'},l,inp(P,k,{type:'number',oninput:()=>pvLoad(true)}));
+  const num=(k,lb,ph)=>h('label',{class:'f'},lb,inp(P,k,{type:'number',ph:ph||'',oninput:()=>pvLoad(true)}));
   const step=dir=>{ if(!d)return; const j=ui.line+dir; if(j<0||j>=d.lines.length)return; ui.line=j; markLine(); pvLoad(false); };
-  return h('div',{'data-sc':'pv',class:'pvcol',style:'min-width:330px'},h('div',{class:'panel'},
+  const imgRow=(label,get,set,del)=>{ const im=getImg(get()); return h('div',{class:'row'},h('span',{style:'min-width:150px'},label),
+    h('button',{class:'sm',onclick:()=>pickFile('image/*','url',u=>{set(u);touch();render();})},get()?'바꾸기':'이미지 불러오기'),
+    get()?h('button',{class:'sm',onclick:()=>{del();touch();render();}},'빼기'):null,
+    get()?h('span',{class:'muted'},im?im.naturalWidth+' × '+im.naturalHeight+'px':'불러오는 중'):null); };
+  P.stands=P.stands||{};
+  const sk=l?l.speaker+'|'+(l.speaker==='player'?'':(l.face||'')):'';
+  return h('div',{'data-sc':'pv',class:'pvcol',style:'min-width:330px;max-width:580px'},h('div',{class:'panel'},
     h('div',{class:'row',style:'margin-bottom:6px'},h('h3',{class:'grow'},'미리보기'),h('span',{class:'muted',id:'pvlabel'},'')),
     h('div',{id:'pvbox'},cv),
     h('div',{class:'pvch',id:'pvch'}),
     h('div',{class:'row',style:'margin-top:8px'},h('button',{class:'sm',onclick:()=>step(-1)},'◀ 이전 줄'),h('button',{class:'pri',onclick:()=>pvLoad(false)},'▶ 재생'),h('button',{class:'sm',onclick:()=>step(1)},'다음 줄 ▶')),
     h('div',{id:'pvinfo'}),
-    h('details',{style:'margin-top:10px'},h('summary',{style:'cursor:pointer'},'말풍선 · 폰트 설정'),
-      h('div',{class:'row',style:'margin-top:6px'},num('w','전체 폭(px)'),num('pw','초상화(px)'),num('rows','줄 수'),num('font','글자(px)'),num('lineH','줄 간격'),num('pad','안쪽 여백'),num('scale','배율'),num('speed','글자당 ms')),
-      h('div',{class:'row',style:'margin-top:6px'},chk(P,'portrait','초상화 칸',()=>pvLoad(true)),chk(P,'pixel','픽셀로 또렷하게',()=>pvLoad(true))),
-      h('div',{class:'row',style:'margin-top:6px'},h('button',{class:'sm',onclick:()=>pickFile('.ttf,.otf,.woff,.woff2','url',(u,f)=>loadFont(u,true,f.name))},'다른 폰트로 바꾸기 (.ttf)'),h('span',{class:'muted',id:'fontname'},fontName||'Galmuri9 (내장)')),
-      h('p',{class:'muted'},'모든 수치는 게임 화면의 실제 픽셀(px)이고 배율 1이면 1:1로 보여요. 전체 폭은 말풍선+초상화를 합친 너비예요. Galmuri9는 글자 크기가 10의 배수(10, 20, 30)일 때 또렷해요.'))));
+    h('details',{style:'margin-top:10px',open:ui.pvOpen,ontoggle:e=>{ui.pvOpen=e.target.open;}},h('summary',{style:'cursor:pointer;font-weight:600'},'이미지 · 말풍선 · 폰트 설정'),
+      h('div',{class:'sec',style:'margin:8px 0 0'},h('h4',{},'이미지'),
+        imgRow('말풍선',()=>P.bubbleImg,u=>P.bubbleImg=u,()=>P.bubbleImg=''),
+        imgRow('스탠딩 (기본)',()=>P.standImg,u=>P.standImg=u,()=>P.standImg=''),
+        l?imgRow('스탠딩 ('+speakerName(l.speaker)+(l.speaker!=='player'&&l.face?' · '+l.face:'')+' 전용)',()=>P.stands[sk]||'',u=>P.stands[sk]=u,()=>{delete P.stands[sk];}):null,
+        h('div',{class:'row'},chk(P,'standBack','스탠딩을 말풍선 뒤에 그리기',()=>pvLoad(true))),
+        h('span',{class:'muted'},'이미지는 원본 픽셀 크기 그대로 그려요. 전용 스탠딩이 없는 화자·표정은 기본 스탠딩이 나옵니다.')),
+      h('div',{class:'sec',style:'margin:10px 0 0'},h('h4',{},'배치 (px, 말풍선 왼쪽 위 기준 · 비우면 자동)'),
+        h('div',{class:'row'},num('sx','스탠딩 x','자동'),num('sy','스탠딩 y','자동'),num('tx','글자 x','자동'),num('ty','글자 y','자동'),num('tw','글자 영역 폭','자동')),
+        h('div',{class:'row'},chk(P,'showName','이름 표시',()=>pvLoad(true)),num('nx','이름 x','자동'),num('ny','이름 y','자동')),
+        h('span',{class:'muted'},'자동: 스탠딩은 말풍선 오른쪽에 바닥을 맞춰 붙어요. 말풍선 위에 겹치게 하려면 스탠딩 x를 줄이고 글자 영역 폭을 정해 주세요.')),
+      h('div',{class:'sec',style:'margin:10px 0 0'},h('h4',{},'글자'),
+        h('div',{class:'row'},num('rows','줄 수'),num('font','글자(px)'),num('lineH','줄 간격'),num('pad','안쪽 여백'),num('w','말풍선 폭 (이미지 없을 때)'),num('scale','배율'),num('speed','글자당 ms')),
+        h('div',{class:'row'},chk(P,'pixel','픽셀로 또렷하게',()=>pvLoad(true)),h('button',{class:'sm',onclick:()=>pickFile('.ttf,.otf,.woff,.woff2','url',(u,f)=>loadFont(u,true,f.name))},'다른 폰트로 바꾸기 (.ttf)'),h('span',{class:'muted',id:'fontname'},fontName||'Galmuri9 (내장)')),
+        h('span',{class:'muted'},'모든 수치는 게임 화면의 실제 픽셀이고 배율 1이면 1:1로 보여요. Galmuri9는 글자 크기가 10의 배수일 때 또렷해요.')))));
 }
 let fontName='';
 async function loadFont(url,save,name){ try{ const ff=new FontFace('MerongGame','url('+url+')'); await ff.load(); document.fonts.add(ff);
@@ -730,11 +757,11 @@ async function loadFont(url,save,name){ try{ const ff=new FontFace('MerongGame',
 /* ---------- 검증 ---------- */
 function validate(){
   const out=[], add=(lv,d,line,msg)=>out.push({lv,dlg:d.id,line,msg});
-  const ids=new Set(db.dialogs.map(d=>d.id)), flags=new Set(db.flags.map(f=>f.id)), items=new Set(tableRows('item').map(f=>f.id)), recipes=new Set(tableRows('recipe').map(f=>f.id)), npcs=new Set(db.npcs.map(n=>n.id));
+  const ids=new Set(db.dialogs.map(d=>d.id)), items=new Set(tableRows('item').map(f=>f.id)), recipes=new Set(tableRows('recipe').map(f=>f.id)), npcs=new Set(db.npcs.map(n=>n.id));
   const linked=new Set(), setFlags=new Set();
   const allFx=d=>d.lines.flatMap(l=>[...l.effects,...l.choices.flatMap(c=>c.effects)]);
   for(const d of db.dialogs){ for(const l of d.lines)for(const c of l.choices)if(c.next)linked.add(c.next); for(const f of allFx(d))if(f.type==='flag'&&f.value!==false)setFlags.add(f.target); }
-  const fxCheck=(d,i,f,where)=>{ const ok=f.type==='affinity'?npcs.has(f.target):f.type==='flag'?flags.has(f.target):f.type==='item'?items.has(f.target):recipes.has(f.target);
+  const fxCheck=(d,i,f,where)=>{ const ok=f.type==='affinity'?npcs.has(f.target):f.type==='item'?items.has(f.target):recipes.has(f.target);
     if(!f.target)add('err',d,i,where+FX[f.type]+' 효과의 대상이 비어 있어요'); else if(!ok)add('err',d,i,where+FX[f.type]+' 효과의 대상 "'+f.target+'" 이(가) 데이터베이스에 없어요'); };
   for(const d of db.dialogs){ const c=d.cond;
     if(db.dialogs.filter(x=>x.id===d.id).length>1)add('err',d,null,'대화 ID가 겹쳐요');
@@ -754,7 +781,7 @@ function validate(){
 function checkView(issues){
   return h('div',{class:'panel'},h('div',{class:'row',style:'margin-bottom:6px'},h('h2',{},'검증'),h('span',{class:'tag pk'},'오류 '+issues.filter(i=>i.lv==='err').length),h('span',{class:'tag',style:'background:#fff6d9'},'경고 '+issues.filter(i=>i.lv==='warn').length)),
     issues.length?issues.map(x=>h('div',{class:'iss',onclick:()=>openDlg(x.dlg,x.line)},h('span',{class:'tag '+(x.lv==='err'?'pk':''),style:x.lv==='err'?'':'background:#fff6d9;color:#8a6a10'},x.lv==='err'?'오류':'경고'),h('span',{style:'min-width:150px'},x.dlg+(x.line!=null?' · '+(x.line+1)+'번 줄':'')),h('span',{class:'grow'},x.msg))):h('p',{},'문제가 없어요.'),
-    h('p',{class:'muted'},'확인하는 것: 끊긴 분기, 없는 손님·표정·플래그·아이템·레시피, 빈 줄, 말풍선 넘침. 항목을 누르면 그 줄로 이동해요.'));
+    h('p',{class:'muted'},'확인하는 것: 끊긴 분기, 없는 손님·표정·아이템·레시피, 빈 줄, 말풍선 넘침. 항목을 누르면 그 줄로 이동해요.'));
 }
 
 /* ---------- 스토리 흐름 ---------- */
@@ -780,7 +807,7 @@ function flowView(){
 function unityExport(){
   const date=k=>{const [m,d]=k.split('-');return {month:+m,day:+d};}, num=v=>v===''||v==null?-1:+v;
   const fx=a=>a.map(f=>({type:f.type,targetId:f.target||'',intValue:f.type==='flag'?(f.value===false?0:1):(+f.value||0)}));
-  return {customers:db.npcs.map(n=>({id:n.id,name:n.name,portraits:facesOf(n.id)})),flags:db.flags,tables:db.tables.map(t=>({name:t.name,kind:t.kind||'',columns:t.cols,rows:t.rows.map(r=>({cells:r.map(c=>String(c??''))}))})),
+  return {customers:db.npcs.map(n=>({id:n.id,name:n.name,category:n.kind||'normal',portraits:facesOf(n.id)})),tables:db.tables.map(t=>({name:t.name,kind:t.kind||'',columns:t.cols,rows:t.rows.map(r=>({cells:r.map(c=>String(c??''))}))})),
     dialogues:db.dialogs.map(d=>({id:d.id,customerId:d.npc,status:d.status,
       lines:d.lines.map(l=>({key:lineKey(d,l),speakerId:l.speaker,portrait:l.face||'',text:l.text,memo:l.memo||'',effects:fx(l.effects),
         choices:l.choices.map((c,i)=>({key:lineKey(d,l)+'_C'+(i+1),text:c.text,nextDialogueId:c.next||'',effects:fx(c.effects)}))}))})),
