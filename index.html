@@ -258,6 +258,9 @@ async function saveFile(name,text){
       if(code==='rate_limited'){toast('저장 창이 이미 떠 있거나 너무 자주 눌렀어요. 잠시 뒤 다시 눌러 주세요');return;}
       why=({rejected_extension:'이 파일 형식은 저장이 막혀 있어요',extension_not_enabled:'이 화면에서는 이 파일 형식 저장이 꺼져 있어요',too_large:'파일이 너무 커요',bad_request:'파일 이름이나 내용에 문제가 있어요'}[code]||'이 화면에서는 저장 기능을 쓸 수 없어요')+' ('+code+(e&&e.message?': '+e.message:'')+')'; } }
   else if(!why) why='이 화면에서는 저장 기능이 허용되지 않았어요 (unavailable)';
+  if(!window.claude){ // Claude 밖(깃허브 페이지 등)에서는 브라우저 기본 다운로드
+    try{ const u=URL.createObjectURL(new Blob([text],{type:/\.csv$/.test(name)?'text/csv;charset=utf-8':'application/json'})), el=h('a',{href:u,download:name,style:'display:none'});
+      document.body.append(el); el.click(); setTimeout(()=>{el.remove();URL.revokeObjectURL(u);},1500); toast(name+' 저장했어요'); return; }catch(e){ why='브라우저 다운로드가 막혀 있어요 ('+e.message+')'; } }
   const ta=h('textarea',{readonly:true,value:text});
   modal(name,h('div',{},h('p',{class:'errbox'},'파일 저장 실패 — '+why),h('p',{class:'muted'},'대신 내용을 그대로 보여드려요. 복사해서 '+name+' 파일로 저장하면 똑같이 불러올 수 있어요.'),ta),
     h('button',{class:'pri',onclick:async()=>{try{await navigator.clipboard.writeText(text);toast('복사했어요');}catch(e){ta.select();toast('Ctrl+C로 복사해 주세요');}}},'전체 복사'));
