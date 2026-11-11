@@ -33,7 +33,7 @@ label.f{display:flex;flex-direction:column;gap:3px;font-size:11px;color:#7a8090}
 .muted{color:#8a90a0;font-size:12px;font-weight:400}
 .panel{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:12px}
 h2,h3{margin:0;font-weight:700} h2{font-size:16px} h3{font-size:13px}
-.tag{display:inline-block;border-radius:6px;padding:1px 7px;font-size:11px;background:var(--grayl);color:#555c6b}
+.tag{display:inline-block;white-space:nowrap;border-radius:6px;padding:1px 7px;font-size:11px;background:var(--grayl);color:#555c6b}
 .tag.sky{background:var(--skyl);color:var(--sky2)} .tag.pk{background:var(--pinkl);color:var(--pink2)} .tag.moss{background:#e4f5ea;color:#3a8f5b}
 .st{display:inline-block;width:8px;height:8px;border-radius:50%;flex:none}
 .st.draft{background:var(--gray)} .st.review{background:var(--warn)} .st.final{background:var(--moss)}
@@ -155,6 +155,7 @@ td.num{text-align:right;font:12px ui-monospace,Consolas,monospace;width:1px;whit
 .grid{width:max-content;min-width:100%}
 .grid td,.grid th{padding:0;border:1px solid var(--line)}
 .grid th{position:sticky;top:0;background:#f6f7f9;z-index:1;padding:0 6px}
+.grid select{border:0;border-radius:0;background:transparent;width:100%;min-width:96px}
 .grid input{border:0;border-radius:0;background:transparent;width:100%;min-width:96px;padding:5px 8px}
 </style>
 </head>
@@ -208,11 +209,12 @@ let db=null, undoSnap=null, saveT=null;
 const ui={tool:'dialog',tab:'edit',dlg:null,line:0,date:null,dateOnly:true,q:'',fNpc:'',fStatus:'',fFlag:'',dbTab:'normal',pvOpen:false,flowNpc:'',coordNpc:''};
 
 function blankDB(sample){
-  const d={app:'merongtool',version:1,name:'새 프로젝트',npcs:[],tables:[],dialogs:[],coord:freshCoord(),
+  const d={app:'merongtool',version:1,name:'새 프로젝트',npcs:[],ncols:{normal:[],special:[],band:[],talk:[]},nseq:1,tables:[],dialogs:[],coord:freshCoord(),
     preview:{v:2,w:480,rows:3,font:20,lineH:28,pad:14,scale:1,speed:40,pixel:true,bubbleImg:'',standImg:'',stands:{},standBack:false,sx:'',sy:'',tx:'',ty:'',tw:'',showName:true,nx:'',ny:''}};
   if(sample){
     d.name='예시 프로젝트';
-    d.npcs=[{id:'npc_moss',name:'모스',color:'#8fc9a3',faces:'기본, 웃음, 당황'},{id:'npc_luna',name:'루나',color:'#8fd0ee',faces:'기본, 졸림',kind:'special'},{id:'band_rio',name:'리오',color:'#f9c0dc',faces:'기본',kind:'band'}];
+    d.npcs=[{id:'npc_moss',name:'모스',color:'#8fc9a3',faces:'기본, 웃음, 당황'},{id:'npc_luna',name:'루나',color:'#8fd0ee',faces:'기본, 졸림',kind:'special'},{id:'band_rio',name:'리오',color:'#f9c0dc',faces:'기본',kind:'band',x:{c0:'기타'}}];
+    d.ncols.band=[{key:'c0',name:'담당 악기',type:'enum',options:['보컬','기타','베이스','드럼','키보드']}];
     d.tables=[{name:'음료 (예시)',kind:'recipe',cols:['ID','CodeName','Name','판매가격','재료1 ID','재료2 ID','재료3 ID','재료4 ID','음료감정1','음료감정2','음료제한시간'],rows:[['1','moss_latte','이끼 라떼','1200','1','2','','','포근함','','30']]},
       {name:'아이템 (예시)',kind:'item',cols:['ID','CodeName','Name','맥스스택','몇번사용가능','물류업자에게 구매하는 가격'],rows:[['1','unknown_seed','이름 모를 씨앗','99','1','300']]}];
     d.dialogs=[
@@ -249,10 +251,15 @@ function modal(title,body,btns){ const m=$('#modal'); put(m,h('div',{class:'pane
 function closeModal(){ $('#modal').style.display='none'; }
 function pickFile(accept,mode,cb){ const f=$('#file'); f.value=''; f.accept=accept; f.onchange=()=>{const file=f.files[0]; if(!file)return; const r=new FileReader(); r.onload=()=>{ let v=r.result; if(mode==='csv'){ try{v=new TextDecoder('utf-8',{fatal:true}).decode(v);}catch(e){v=new TextDecoder('euc-kr').decode(v);} } cb(v,file); }; mode==='url'?r.readAsDataURL(file):mode==='csv'?r.readAsArrayBuffer(file):r.readAsText(file);}; f.click(); }
 async function saveFile(name,text){
-  let dlc=null; try{ if(window.claude&&claude.use) dlc=await claude.use('downloads'); }catch(e){}
-  if(dlc){ try{ await dlc.save({filename:name,data:text}); toast(name+' 저장했어요'); return; }catch(e){ if(e&&e.code==='declined'){toast('저장을 취소했어요');return;} } }
+  let dlc=null, why='';
+  try{ if(window.claude&&claude.use) dlc=await claude.use('downloads'); else why='이 화면에는 저장 기능이 연결돼 있지 않아요 (no-runtime)'; }catch(e){ why='저장 기능을 불러오지 못했어요 (use-failed)'; }
+  if(dlc){ try{ await dlc.save({filename:name,data:text}); toast(name+' 저장했어요'); return; }
+    catch(e){ const code=(e&&e.code)||'unknown'; if(code==='declined'){toast('저장을 취소했어요');return;}
+      if(code==='rate_limited'){toast('저장 창이 이미 떠 있거나 너무 자주 눌렀어요. 잠시 뒤 다시 눌러 주세요');return;}
+      why=({rejected_extension:'이 파일 형식은 저장이 막혀 있어요',extension_not_enabled:'이 화면에서는 이 파일 형식 저장이 꺼져 있어요',too_large:'파일이 너무 커요',bad_request:'파일 이름이나 내용에 문제가 있어요'}[code]||'이 화면에서는 저장 기능을 쓸 수 없어요')+' ('+code+(e&&e.message?': '+e.message:'')+')'; } }
+  else if(!why) why='이 화면에서는 저장 기능이 허용되지 않았어요 (unavailable)';
   const ta=h('textarea',{readonly:true,value:text});
-  modal(name,h('div',{},h('p',{class:'muted'},'이 화면에서는 파일 저장을 쓸 수 없어서 내용을 그대로 보여드려요. 복사해서 '+name+' 파일로 저장해 주세요.'),ta),
+  modal(name,h('div',{},h('p',{class:'errbox'},'파일 저장 실패 — '+why),h('p',{class:'muted'},'대신 내용을 그대로 보여드려요. 복사해서 '+name+' 파일로 저장하면 똑같이 불러올 수 있어요.'),ta),
     h('button',{class:'pri',onclick:async()=>{try{await navigator.clipboard.writeText(text);toast('복사했어요');}catch(e){ta.select();toast('Ctrl+C로 복사해 주세요');}}},'전체 복사'));
 }
 const npcOf=id=>db.npcs.find(n=>n.id===id);
@@ -320,6 +327,21 @@ function renderCal(){
 /* ---------- 데이터베이스 ---------- */
 const NK=[['normal','손님(NPC)'],['special','특별손님'],['band','밴드멤버'],['talk','대사만 있는 손님']];
 const NCOLS=[['id','ID'],['name','이름'],['color','색','color'],['faces','표정 목록 (쉼표로 구분)']];
+function colModal(cur,save,del){
+  const name=h('input',{type:'text',value:cur.name||'',style:'width:100%'});
+  const type=h('select',{},[['text','텍스트'],['number','숫자'],['enum','선택 목록 (enum)']].map(([v,l])=>h('option',{value:v},l))); type.value=cur.type||'text';
+  const opts=h('textarea',{value:(cur.options||[]).join('\n'),placeholder:'보컬\n기타\n드럼',style:'height:150px'});
+  const box=h('label',{class:'f'},'선택 값 (한 줄에 하나)',opts), sync=()=>{box.style.display=type.value==='enum'?'':'none';}; type.addEventListener('change',sync); sync();
+  modal('열 설정',h('div',{style:'display:flex;flex-direction:column;gap:10px'},h('label',{class:'f'},'열 이름',name),h('label',{class:'f'},'값 종류',type),box,
+      h('span',{class:'muted'},'선택 목록으로 하면 칸이 드롭다운이 돼요. 목록에 없는 기존 값은 ⚠ 표시로 남습니다.')),
+    [h('button',{class:'pk',onclick:()=>{snap();del();closeModal();touch();render();toast('열을 삭제했어요',true);}},'열 삭제'),h('button',{onclick:closeModal},'취소'),
+     h('button',{class:'pri',onclick:()=>{save({name:name.value.trim()||'열',type:type.value,options:[...new Set(opts.value.split(/\n/).map(x=>x.trim()).filter(Boolean))]});closeModal();touch();render();}},'저장')]);
+  name.focus(); name.select();
+}
+function typedCell(m,get,set){
+  if(m.type==='enum')return sel([['','—'],...(m.options||[])],String(get()??''),set);
+  const e=h('input',{type:m.type==='number'?'number':'text',value:get()??''}); e.addEventListener('input',()=>{set(e.value);touch();}); return e;
+}
 const toCSV=rows=>rows.map(r=>r.map(s=>'"'+String(s??'').replace(/"/g,'""')+'"').join(',')).join('\r\n');
 function tableRows(kind){ const out=[];
   for(const t of db.tables){ if(t.kind!==kind)continue; const lc=t.cols.map(c=>String(c).trim().toLowerCase()); let ii=lc.indexOf('id'); if(ii<0)ii=0; let ni=lc.indexOf('name'); if(ni<0)ni=lc.indexOf('codename');
@@ -331,13 +353,15 @@ function importCSV(ti){
     const rows=csvParse(text,dm).filter(r=>r.some(c=>String(c).trim()!=='')); if(!rows.length){toast('빈 파일이에요');return;}
     const cols=rows[0].map(c=>String(c).trim()), data=rows.slice(1).map(r=>{const a=r.slice(0,cols.length);while(a.length<cols.length)a.push('');return a;});
     snap();
-    if(ti!=null){ db.tables[ti].cols=cols; db.tables[ti].rows=data; }
+    if(ti!=null){ const t=db.tables[ti], old={}; t.cols.forEach((c,i)=>{ if((t.meta||[])[i])old[c]=t.meta[i]; }); t.cols=cols; t.rows=data; t.meta=cols.map(c=>old[c]||null); }
     else{ const j=cols.join(' '); db.tables.push({name:file.name.replace(/\.[^.]+$/,''),kind:/재료|판매가격/.test(j)?'recipe':/스택/.test(j)?'item':'',cols,rows:data}); ui.dbTab='t'+(db.tables.length-1); }
     touch(); render(); toast('CSV를 불러왔어요: '+data.length+'행 × '+cols.length+'열',true); });
 }
 function tableView(ti){
   const t=db.tables[ti];
-  const cell=(r,ci)=>{const e=h('input',{type:'text',value:r[ci]??''});e.addEventListener('input',()=>{r[ci]=e.value;touch();});return e;};
+  t.meta=t.meta||[];
+  const cell=(r,ci)=>typedCell(t.meta[ci]||{},()=>r[ci],v=>r[ci]=v);
+  const delCol=ci=>{t.cols.splice(ci,1);t.meta.length=Math.max(t.meta.length,ci+1);t.meta.splice(ci,1);t.rows.forEach(r=>r.splice(ci,1));};
   const colIn=ci=>{const e=h('input',{type:'text',value:t.cols[ci],style:'font-weight:700'});e.addEventListener('input',()=>{t.cols[ci]=e.value;touch();});return e;};
   return h('div',{class:'panel'},
     h('div',{class:'row',style:'margin-bottom:8px'},inp(t,'name',{rerender:true,style:'width:180px',ph:'표 이름'}),
@@ -347,11 +371,11 @@ function tableView(ti){
       h('button',{class:'sm',onclick:()=>saveFile((t.name||'table')+'.csv','﻿'+toCSV([t.cols,...t.rows]))},'CSV 내보내기'),
       h('button',{class:'sm pk',onclick:()=>{snap();db.tables.splice(ti,1);ui.dbTab='normal';touch();render();toast('표를 삭제했어요',true);}},'표 삭제')),
     h('div',{class:'gridwrap','data-sc':'tbl'},h('table',{class:'grid'},
-      h('tr',{},h('th',{},'#'),t.cols.map((c,ci)=>h('th',{},h('div',{style:'display:flex;align-items:center'},colIn(ci),h('button',{class:'sm ghost',title:'열 삭제',onclick:()=>{snap();t.cols.splice(ci,1);t.rows.forEach(r=>r.splice(ci,1));touch();render();toast('열을 삭제했어요',true);}},'✕')))),h('th',{},'')),
+      h('tr',{},h('th',{},'#'),t.cols.map((c,ci)=>h('th',{},h('div',{style:'display:flex;align-items:center'},colIn(ci),(t.meta[ci]||{}).type==='enum'?h('span',{class:'tag sky'},'목록'):null,h('button',{class:'sm ghost',title:'열 설정 (이름 · 값 종류 · 선택 목록)',onclick:()=>colModal(Object.assign({name:t.cols[ci]},t.meta[ci]||{}),o=>{t.cols[ci]=o.name;t.meta[ci]={type:o.type,options:o.options};},()=>delCol(ci))},'⚙'),h('button',{class:'sm ghost',title:'열 삭제',onclick:()=>{snap();delCol(ci);touch();render();toast('열을 삭제했어요',true);}},'✕')))),h('th',{},'')),
       t.rows.map((r,ri)=>h('tr',{},h('td',{class:'muted',style:'padding:0 6px'},ri+1),t.cols.map((c,ci)=>h('td',{},cell(r,ci))),
         h('td',{},h('button',{class:'sm ghost',title:'행 삭제',onclick:()=>{snap();t.rows.splice(ri,1);touch();render();toast('행을 삭제했어요',true);}},'✕')))))),
     h('div',{class:'row',style:'margin-top:8px'},h('button',{class:'pri sm',onclick:()=>{t.rows.push(t.cols.map(()=>''));touch();render();}},'+ 행 추가'),
-      h('button',{class:'sm',onclick:()=>{t.cols.push('새 열');t.rows.forEach(r=>r.push(''));touch();render();}},'+ 열 추가'),
+      h('button',{class:'sm',onclick:()=>{const ci=t.cols.length;t.cols.push('새 열');t.rows.forEach(r=>r.push(''));touch();render();colModal({name:'새 열'},o=>{t.cols[ci]=o.name;t.meta[ci]={type:o.type,options:o.options};},()=>delCol(ci));}},'+ 열 추가'),
       h('span',{class:'muted'},'CSV의 열과 값을 그대로 보관해요. 용도를 정하면 ID 열과 Name 열을 읽어 대화 효과의 드롭다운에 씁니다.')));
 }
 function dbView(){
@@ -363,17 +387,22 @@ function dbView(){
     h('button',{class:'pri',onclick:()=>importCSV()},'+ CSV 불러오기'));
   if(isT())return h('div',{},tabs,tableView(+ui.dbTab.slice(1)));
   const rows=db.npcs.filter(n=>kindOf(n)===ui.dbTab), ids=db.npcs.map(r=>r.id), dup=new Set(ids.filter((x,i)=>ids.indexOf(x)!==i));
+  const xc=db.ncols[ui.dbTab]||(db.ncols[ui.dbTab]=[]);
+  const addCol=()=>{const c={key:'c'+(db.nseq++),name:'새 열',type:'text',options:[]};xc.push(c);touch();render();colModal(c,o=>Object.assign(c,o),()=>xc.splice(xc.indexOf(c),1));};
   const pre={normal:'npc',special:'special',band:'band',talk:'talk'}[ui.dbTab];
   return h('div',{},tabs,
     h('div',{class:'panel'},
-      h('table',{},h('tr',{},NCOLS.map(c=>h('th',{},c[1])),h('th',{style:'width:150px'},'분류'),h('th',{style:'width:40px'},'')),
+      h('div',{style:'overflow:auto'},h('table',{style:'min-width:'+(700+xc.length*150)+'px'},h('tr',{},NCOLS.map(c=>h('th',{},c[1])),
+          xc.map(c=>h('th',{},c.name,c.type==='enum'?h('span',{class:'tag sky',style:'margin-left:4px'},'목록'):null,h('button',{class:'sm ghost',title:'열 설정 (이름 · 값 종류 · 선택 목록 · 삭제)',onclick:()=>colModal(c,o=>Object.assign(c,o),()=>xc.splice(xc.indexOf(c),1))},'⚙'))),
+          h('th',{style:'width:150px'},'분류'),h('th',{style:'width:40px'},'')),
         rows.map(r=>h('tr',{},NCOLS.map(c=>h('td',{style:c[0]==='id'&&dup.has(r.id)?'background:var(--pinkl)':''},inp(r,c[0],{type:c[2]||'text',rerender:c[0]==='id'}))),
+          xc.map(c=>h('td',{},typedCell(c,()=>(r.x||{})[c.key],v=>{(r.x||(r.x={}))[c.key]=v;}))),
           h('td',{},sel(NK,kindOf(r),v=>r.kind=v)),
-          h('td',{},h('button',{class:'sm ghost',title:'삭제',onclick:()=>{snap();db.npcs.splice(db.npcs.indexOf(r),1);touch();render();toast('삭제했어요',true);}},'✕'))))),
+          h('td',{},h('button',{class:'sm ghost',title:'삭제',onclick:()=>{snap();db.npcs.splice(db.npcs.indexOf(r),1);touch();render();toast('삭제했어요',true);}},'✕')))))),
       rows.length?null:h('p',{class:'muted'},'아직 없어요.'),
-      h('div',{class:'row',style:'margin-top:8px'},h('button',{class:'pri',onclick:()=>{db.npcs.push({id:pre+'_new',name:'',color:'#8fd0ee',faces:'기본',kind:ui.dbTab});touch();render();}},'+ 추가'),
+      h('div',{class:'row',style:'margin-top:8px'},h('button',{class:'pri',onclick:()=>{db.npcs.push({id:pre+'_new',name:'',color:'#8fd0ee',faces:'기본',kind:ui.dbTab});touch();render();}},'+ 추가'),h('button',{onclick:addCol},'+ 열 추가'),
         dup.size?h('span',{class:'tag pk'},'겹치는 ID가 있어요 (분류가 달라도 ID는 하나씩)'):null,
-        h('span',{class:'muted'},'네 분류 모두 대화 툴의 손님·화자 드롭다운에 나와요. ID를 바꾸면 그 ID를 쓰던 대화는 검증 탭에서 잡아줍니다.'))));
+        h('span',{class:'muted'},'열은 분류마다 따로예요. ⚙에서 값 종류를 선택 목록으로 바꾸면 드롭다운이 됩니다. 네 분류 모두 대화 툴의 손님·화자 드롭다운에 나와요.'))));
 }
 
 /* ---------- 좌표 설정 툴 (NPC 좌표 설정기 이식, 캘린더 부분 제외) ---------- */
@@ -807,7 +836,7 @@ function flowView(){
 function unityExport(){
   const date=k=>{const [m,d]=k.split('-');return {month:+m,day:+d};}, num=v=>v===''||v==null?-1:+v;
   const fx=a=>a.map(f=>({type:f.type,targetId:f.target||'',intValue:f.type==='flag'?(f.value===false?0:1):(+f.value||0)}));
-  return {customers:db.npcs.map(n=>({id:n.id,name:n.name,category:n.kind||'normal',portraits:facesOf(n.id)})),tables:db.tables.map(t=>({name:t.name,kind:t.kind||'',columns:t.cols,rows:t.rows.map(r=>({cells:r.map(c=>String(c??''))}))})),
+  return {customers:db.npcs.map(n=>({id:n.id,name:n.name,category:n.kind||'normal',portraits:facesOf(n.id),extra:((db.ncols||{})[n.kind||'normal']||[]).map(c=>({name:c.name,value:String((n.x||{})[c.key]??'')}))})),tables:db.tables.map(t=>({name:t.name,kind:t.kind||'',columns:t.cols,rows:t.rows.map(r=>({cells:r.map(c=>String(c??''))}))})),
     dialogues:db.dialogs.map(d=>({id:d.id,customerId:d.npc,status:d.status,
       lines:d.lines.map(l=>({key:lineKey(d,l),speakerId:l.speaker,portrait:l.face||'',text:l.text,memo:l.memo||'',effects:fx(l.effects),
         choices:l.choices.map((c,i)=>({key:lineKey(d,l)+'_C'+(i+1),text:c.text,nextDialogueId:c.next||'',effects:fx(c.effects)}))}))})),
