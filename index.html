@@ -75,7 +75,7 @@ main{flex:1;min-width:0;display:flex;flex-direction:column}
 .tabs button.on .muted{color:#fff}
 .badge{background:var(--pink2);color:#fff;border-radius:8px;padding:0 6px;margin-left:5px;font-size:11px}
 
-.dlg{display:grid;grid-template-columns:240px minmax(340px,1fr) auto;gap:12px;height:100%}
+.dlg{display:grid;grid-template-columns:270px minmax(340px,1fr) auto;gap:12px;height:100%}
 .dlg>div{min-height:0;overflow:auto}
 .dlgwrap{display:flex;flex-direction:column;height:100%}
 .dlgwrap .dlg{flex:1;min-height:0}
@@ -209,36 +209,30 @@ const LS='merongtool.autosave', LSF='merongtool.font';
 let FONT='"Galmuri9","Galmuri11","DungGeunMo","NeoDunggeunmo","Neo둥근모","DOSGothic","Malgun Gothic",sans-serif'; // 미리보기(게임 화면) 전용 폰트
 
 let db=null, undoSnap=null, saveT=null;
-const ui={tool:'dialog',tab:'edit',dlg:null,line:0,date:null,dateOnly:true,q:'',fNpc:'',fStatus:'',fFlag:'',dbTab:'normal',pvOpen:false,flowNpc:'',coordNpc:''};
+const ui={vnpc:null,tool:'dialog',tab:'edit',dlg:null,line:0,date:null,dateOnly:true,q:'',fNpc:'',fStatus:'',fFlag:'',dbTab:'normal',pvOpen:false,flowNpc:'',coordNpc:''};
 
 function blankDB(sample){
-  const d={app:'merongtool',version:1,name:'새 프로젝트',npcs:[],ncols:{},nseq:1,nlabel:{},nfile:{},xfile:{},tables:[defaultDateTable()],dialogs:[],coord:freshCoord(),
+  const d={app:'merongtool',version:1,name:'새 프로젝트',npcs:[],ncols:{},nseq:1,nlabel:{},nfile:{},xfile:{},schema:3,tables:[defaultDateTable()],visits:[],lines:[],coord:freshCoord(),
     preview:{v:2,w:480,rows:3,font:20,lineH:28,pad:14,scale:1,speed:40,pixel:true,bubbleImg:'',standImg:'',stands:{},standBack:false,sx:'',sy:'',tx:'',ty:'',tw:'',showName:true,nx:'',ny:''}};
   ensureNpcCols(d);
   if(sample){
     d.name='예시 프로젝트';
-    d.npcs=[{id:'1001',code:'Moss',name:'모스',color:'#8fc9a3',faces:'기본, 웃음, 당황'},{id:'2001',code:'Luna',name:'루나',color:'#8fd0ee',faces:'기본, 졸림',kind:'special'},{id:'3001',code:'Rio',name:'리오',color:'#f9c0dc',faces:'기본',kind:'band',x:{c0:'기타'}}];
+    d.npcs=[{id:'Moss',num:'1001',name:'모스',color:'#8fc9a3',faces:'기본, 웃음, 당황'},{id:'Luna',num:'2001',name:'루나',color:'#8fd0ee',faces:'기본, 졸림',kind:'special'},{id:'Rio',num:'3001',name:'리오',color:'#f9c0dc',faces:'기본',kind:'band',x:{c0:'기타'}}];
     d.ncols.band=[{key:'c0',name:'담당 악기',type:'enum',options:['보컬','기타','베이스','드럼','키보드']}];
     ensureNpcCols(d);
-    d.tables=[d.tables[0],{name:'음료 (예시)',file:'ProductDataTable',kind:'recipe',cols:['ID','CodeName','Name','판매가격','재료1 ID','재료2 ID','재료3 ID','재료4 ID','음료감정1','음료감정2','음료제한시간'],rows:[['1','moss_latte','이끼 라떼','1200','1','2','','','포근함','','30']]},
-      {name:'아이템 (예시)',file:'IngredientDataTable',kind:'item',cols:['ID','CodeName','Name','맥스스택','몇번사용가능','물류업자에게 구매하는 가격'],rows:[['1','unknown_seed','이름 모를 씨앗','99','1','300']]}];
-    d.dialogs=[
-      {id:'moss_visit1',title:'첫 방문',npc:'1001',status:'review',entry:'cond',seq:3,
-       cond:{visit:1,affMin:'',affMax:'',mood:'',dates:[],flags:[]},
-       lines:[{n:1,speaker:'1001',face:'기본',text:'어서 와, \\C[2]멜로\\C[0].\\| 여기 처음이지?',memo:'',effects:[],choices:[]},
-              {n:2,speaker:'1001',face:'웃음',text:'오늘은 \\{이끼 라떼\\} 한 잔 부탁해도 될까?',memo:'여기서 주문 UI 연출',effects:[],
-               choices:[{text:'금방 만들어 줄게!',next:'moss_visit1_yes',effects:[{type:'affinity',target:'1001',value:2}]},{text:'그게 뭔데…?',next:'moss_visit1_what',effects:[]}]}]},
-      {id:'moss_visit1_yes',title:'첫 방문 - 수락',npc:'1001',status:'draft',entry:'link',seq:2,cond:{visit:'',affMin:'',affMax:'',mood:'',dates:[],flags:[]},
-       lines:[{n:1,speaker:'1001',face:'웃음',text:'고마워.\\. 이건 답례야.',memo:'',effects:[{type:'item',target:'1',value:1}],choices:[]}]},
-      {id:'moss_visit1_what',title:'첫 방문 - 되묻기',npc:'1001',status:'draft',entry:'link',seq:2,cond:{visit:'',affMin:'',affMax:'',mood:'',dates:[],flags:[]},
-       lines:[{n:1,speaker:'1001',face:'당황',text:'어…\\. 그러니까, 초록색이고 폭신폭신한 거.\n레시피 적어 줄게.',memo:'',effects:[{type:'recipe',target:'1',value:1}],choices:[]}]},
-      {id:'luna_0605',title:'6월 5일 특별 방문',npc:'2001',status:'draft',entry:'cond',seq:2,cond:{visit:'',affMin:'',affMax:'',mood:'',dates:['6-5'],flags:['met_moss']},
-       lines:[{n:1,speaker:'2001',face:'졸림',text:'모스한테 얘기 들었어….\\! 여기 조용해서 좋다.',memo:'',effects:[],choices:[]}]}];
+    d.tables=[d.tables[0],{name:'음료 (예시)',file:'ProductDataTable',kind:'',cols:['ID','CodeName','Name','판매가격','재료1 ID','재료2 ID','재료3 ID','재료4 ID','음료감정1','음료감정2','음료제한시간'],rows:[['1','moss_latte','이끼 라떼','1200','1','2','','','포근함','','30']]},
+      {name:'아이템 (예시)',file:'IngredientDataTable',kind:'',cols:['ID','CodeName','Name','맥스스택','몇번사용가능','물류업자에게 구매하는 가격'],rows:[['1','unknown_seed','이름 모를 씨앗','99','1','300']]}];
+    d.visits=[{d:'6-1',npc:'Moss',order:1},{d:'6-1',npc:'Luna',order:2},{d:'6-5',npc:'Luna',order:1}];
+    d.lines=[{d:'6-1',npc:'Moss',order:1,speaker:'Moss',face:'기본',text:'어서 와, \\C[2]멜로\\C[0].\\| 여기 처음이지?'},
+      {d:'6-1',npc:'Moss',order:2,speaker:'player',face:'',text:'응, 오늘 문 열었어.'},
+      {d:'6-1',npc:'Moss',order:3,speaker:'Moss',face:'웃음',text:'그럼 \\{이끼 라떼\\} 한 잔 부탁해도 될까?'},
+      {d:'6-1',npc:'Luna',order:1,speaker:'Luna',face:'졸림',text:'여기 조용해서 좋다….\\! 한숨 자도 돼?'},
+      {d:'6-5',npc:'Luna',order:1,speaker:'Luna',face:'기본',text:'모스한테 얘기 들었어.\n오늘은 안 졸려.'}];
   }
   return d;
 }
 function normalize(d){ // 오래된 세이브·빠진 필드 보정
-  const b=blankDB(false);
+  const b=blankDB(false), oldSchema=d.schema;
   for(const k in b) if(d[k]==null) d[k]=b[k];
   for(const [k,nm,kind] of [['items','아이템','item'],['recipes','레시피','recipe']]){ if(Array.isArray(d[k])&&d[k].length)d.tables.push({name:nm,kind,cols:['ID','Name','설명'],rows:d[k].map(r=>[r.id,r.name||'',r.desc||''])}); delete d[k]; }
   for(const t of d.tables){ if(!t.kind&&isDateCols(t.cols)&&!d.tables.some(x=>x.kind==='date'))t.kind='date'; }
@@ -247,9 +241,17 @@ function normalize(d){ // 오래된 세이브·빠진 필드 보정
   ensureNpcCols(d);
   delete d.vars; delete d.flags; for(const n of d.npcs)n.kind=n.kind||'normal';
   d.preview=d.preview&&d.preview.v===2?Object.assign(b.preview,d.preview):b.preview; delete d.coords; delete d.map; d.coord=Object.assign(b.coord,d.coord);
-  for(const g of d.dialogs){ g.cond=Object.assign({visit:'',affMin:'',affMax:'',mood:'',dates:[],flags:[]},g.cond); g.lines=g.lines||[]; g.entry=g.entry||'cond'; g.status=g.status||'draft';
-    g.seq=g.seq||g.lines.length+1;
-    for(const l of g.lines){ l.effects=(l.effects||[]).filter(f=>f.type!=='flag'); for(const c of l.choices||[])c.effects=(c.effects||[]).filter(f=>f.type!=='flag'); l.choices=l.choices||[]; l.memo=l.memo||''; if(!l.n)l.n=g.seq++; for(const c of l.choices)c.effects=c.effects||[]; } }
+  if(oldSchema!==3){ // 예전 세이브: 이름표(영문)를 NPC의 ID로 쓰도록 바꾸고, 그 ID를 쓰던 곳도 같이 바꾼다
+    const map={}, used=new Set();
+    for(const n of d.npcs){ const old=n.id; let id=String(n.code||'').trim()||String(old); while(used.has(id))id+='_'; used.add(id);
+      if(!n.num&&/^\d+$/.test(String(old)))n.num=String(old); map[old]=id; n.id=id; delete n.code; }
+    const fix=o=>{ if(o&&o.npc&&map[o.npc])o.npc=map[o.npc]; };
+    for(const k in d.coord.daily)for(const sid in d.coord.daily[k])for(const c in d.coord.daily[k][sid])fix(d.coord.daily[k][sid][c]);
+    for(const c in d.coord.fixed)fix(d.coord.fixed[c]);
+    if(Array.isArray(d.dialogs)&&d.dialogs.length)d.oldDialogs=d.dialogs; // 예전 분기형 대화는 화면에 안 나오지만 세이브에는 남겨 둔다
+    delete d.dialogs; d.schema=3;
+  }
+  for(const t of d.tables)if(t.kind==='item'||t.kind==='recipe')t.kind='';
   return d;
 }
 function touch(){ clearTimeout(saveT); saveT=setTimeout(()=>{ try{localStorage.setItem(LS,JSON.stringify({t:Date.now(),db}));}catch(e){ try{localStorage.setItem(LS,JSON.stringify({t:Date.now(),db:Object.assign({},db,{coord:Object.assign({},db.coord,{bg:null}),preview:Object.assign({},db.preview,{bubbleImg:'',standImg:'',stands:{}})})}));touch.lite=true;}catch(e2){} } const s=$('#saved'); if(s)s.textContent=(touch.lite?'자동 저장됨 (이미지는 용량 때문에 제외 · 세이브 저장에는 포함) ':'자동 저장됨 ')+new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}); },500); }
@@ -278,8 +280,6 @@ async function saveFile(name,text){
 const npcOf=id=>db.npcs.find(n=>n.id===id);
 const facesOf=id=>{const n=npcOf(id);return n?String(n.faces||'').split(',').map(s=>s.trim()).filter(Boolean):[];};
 const speakerName=id=>id==='player'?'플레이어':(npcOf(id)||{name:id||'?'}).name;
-const curDlg=()=>db.dialogs.find(d=>d.id===ui.dlg)||null;
-const lineKey=(d,l)=>d.id+'_L'+String(l.n).padStart(3,'0');
 function inp(o,k,opt={}){ const e=h(opt.area?'textarea':'input',{type:opt.area?null:(opt.type||'text'),class:opt.cls||'',placeholder:opt.ph||'',value:o[k]??'',style:opt.style,title:opt.title});
   e.addEventListener('input',()=>{o[k]=opt.type==='number'?(e.value===''?'':+e.value):e.value; touch(); opt.oninput&&opt.oninput(e);});
   if(opt.rerender)e.addEventListener('change',render); return e; }
@@ -296,8 +296,8 @@ function showTitle(){
     h('button',{onclick:()=>start(blankDB($('#sample').checked))},'새롭게 시작하기'));
   $('#title').style.display='flex'; $('#app').hidden=true;
 }
-function loadProject(){ pickFile('.json,application/json','text',txt=>{ try{ const d=JSON.parse(txt); if(!d||!Array.isArray(d.dialogs)||!Array.isArray(d.npcs))throw 0; start(normalize(d)); toast('세이브를 불러왔어요'); }catch(e){ toast('이 툴의 세이브 파일(.json)이 아니에요'); } }); }
-function start(d){ db=d; ui.dlg=db.dialogs[0]?db.dialogs[0].id:null; ui.line=0; $('#title').style.display='none'; $('#app').hidden=false; touch(); route(); }
+function loadProject(){ pickFile('.json,application/json','text',txt=>{ try{ const d=JSON.parse(txt); if(!d||!Array.isArray(d.npcs))throw 0; start(normalize(d)); toast('세이브를 불러왔어요'); }catch(e){ toast('이 툴의 세이브 파일(.json)이 아니에요'); } }); }
+function start(d){ db=d; ui.vnpc=null; ui.line=0; $('#title').style.display='none'; $('#app').hidden=false; touch(); route(); }
 
 /* ---------- 틀 ---------- */
 const TOOLS=[['db','데이터베이스'],['coord','좌표 설정 툴'],['dialog','대화 툴']];
@@ -313,7 +313,7 @@ function render(){
   const v=$('#view'); v.dataset.sc='view';
   put(v,ui.tool==='db'?dbView():ui.tool==='coord'?coordView():dialogView());
   document.querySelectorAll('[data-sc]').forEach(e=>{ if(keep[e.dataset.sc]){e.scrollTop=keep[e.dataset.sc][0];e.scrollLeft=keep[e.dataset.sc][1];} });
-  if(ui.tool==='dialog'&&ui.tab==='edit')pvLoad(true);
+  if(ui.tool==='dialog')pvLoad(true);
 }
 function renderTop(){
   if($('#top').childElementCount){ return; }
@@ -325,7 +325,7 @@ function renderTop(){
     h('button',{onclick:exportModal},'내보내기'),
     h('button',{class:'ghost',onclick:()=>{ put($('#top'),); showTitle(); }},'타이틀로'));
 }
-function dateSets(){ const s=new Set(); for(const k in db.coord.daily) if(Object.values(db.coord.daily[k]).some(o=>Object.keys(o).length))s.add(k); return s; }
+function dateSets(){ const s=new Set(); for(const v of db.visits)s.add(v.d); for(const k in db.coord.daily) if(Object.values(db.coord.daily[k]).some(o=>Object.keys(o).length))s.add(k); return s; }
 /* ---------- 날짜 데이터 (kind:'date' 표) ---------- */
 const DOW='일월화수목금토';
 const DATECOLS=['ID','CodeName','Name','월','일','요일','가게영업여부','진행이벤트','오늘의 일반 손님 예정','예정 특별손님ID 1','예정 특별손님ID 2','예정 특별손님ID 3','예정 특별손님ID 4','메모'];
@@ -346,7 +346,7 @@ function dateMap(){
   const ci=cs.findIndex(c=>c.toLowerCase()==='id'),cm=ix('월'),cd=ix('일'),cw=ix('요일'),co=find('가게영업'),ce=find('이벤트'),cg=find('일반손님'),cn=find('메모'),sp=cs.map((c,i)=>c.includes('특별손님')?i:-1).filter(i=>i>=0);
   if(cm<0||cd<0)return m;
   const g=(r,i)=>i>=0?String(r[i]??'').trim():'';
-  for(const r of t.rows){ if(!(+r[cm]&&+r[cd]))continue; m[(+r[cm])+'-'+(+r[cd])]={id:g(r,ci),dow:g(r,cw)?DOW.indexOf(g(r,cw).charAt(0)):-1,closed:g(r,co)==='-1'||g(r,co)==='0',event:g(r,ce),guests:g(r,cg),memo:g(r,cn),special:sp.map(i=>g(r,i)).filter(v=>v&&v!=='-1')}; }
+  for(const r of t.rows){ if(!(+r[cm]&&+r[cd]))continue; m[(+r[cm])+'-'+(+r[cd])]={id:g(r,ci),code:g(r,cs.findIndex(c=>c.toLowerCase()==='codename')),dow:g(r,cw)?DOW.indexOf(g(r,cw).charAt(0)):-1,closed:g(r,co)==='-1'||g(r,co)==='0',event:g(r,ce),guests:g(r,cg),memo:g(r,cn),special:sp.map(i=>g(r,i)).filter(v=>v&&v!=='-1')}; }
   const seq=ALLDATES.filter(k=>!SPECIAL.includes(k)), base=seq.findIndex(k=>m[k]&&m[k].dow>=0); // 6~8월은 이어진 날짜라 빈 요일을 채워 준다
   if(base>=0)seq.forEach((k,i)=>{ if(!m[k])m[k]={dow:-1,special:[]}; if(m[k].dow<0)m[k].dow=(((m[seq[base]].dow+i-base)%7)+7)%7; });
   return m;
@@ -372,13 +372,13 @@ function renderCal(){
     MONTHS.map(([m,n])=>{ const first=dowOf(m+'-1');
       return [h('h4',{},m+'월'),first>=0?h('div',{class:'days wk'},[...DOW].map((x,j)=>h('span',{class:j===0?'sun':j===6?'sat':''},x))):null,
         h('div',{class:'days'},Array.from({length:n},(_,i)=>day(m+'-'+(i+1),i+1,i===0&&first>=0?'grid-column-start:'+(first+1):null)))]; }),
-    h('p',{class:'muted'},'초록 점: NPC 배치 있음 · 빗금: 휴무. 요일과 휴무는 데이터베이스의 날짜 표에서 가져와요.'));
+    h('p',{class:'muted'},'초록 점: 방문자나 NPC 배치 있음 · 빗금: 휴무. 요일과 휴무는 데이터베이스의 날짜 표에서 가져와요.'));
 }
 
 /* ---------- 데이터베이스 ---------- */
 const NK=[['normal','손님(NPC)'],['special','특별손님'],['band','밴드멤버'],['talk','대사만 있는 손님']];
 const NKL=()=>NK.map(([k,l])=>[k,((db.nlabel||{})[k]||'').trim()||l]);
-const NCOLS=[['id','ID (숫자)'],['code','CodeName'],['name','이름'],['faces','표정 목록 (쉼표로 구분)']];
+const NCOLS=[['id','이름표 (ID, 영문)'],['name','한글 이름'],['num','유니티 ID (숫자)'],['faces','표정 목록 (쉼표로 구분)']];
 // 유니티 임포터가 열 순서로 읽기 때문에, 아래 기본 열은 항상 맨 앞에 이 순서로 둔다
 const NVAL=['Value_Happy_Min','Value_Happy_Max','Value_Anger_Min','Value_Anger_Max','Value_Love_Min','Value_Love_Max','Value_Sad_Min','Value_Sad_Max'];
 const NDEF={normal:['TalkStartID',...NVAL],special:['TalkStartID',...NVAL],band:['TalkStartID'],talk:['TalkStartID']};
@@ -412,7 +412,7 @@ function importCSV(ti){
     const cols=rows[0].map(c=>String(c).trim()), data=rows.slice(1).map(r=>{const a=r.slice(0,cols.length);while(a.length<cols.length)a.push('');return a;});
     snap();
     if(ti!=null){ const t=db.tables[ti], old={}; t.cols.forEach((c,i)=>{ if((t.meta||[])[i])old[c]=t.meta[i]; }); t.cols=cols; t.rows=data; t.meta=cols.map(c=>old[c]||null); }
-    else{ const j=cols.join(' '); db.tables.push({name:file.name.replace(/\.[^.]+$/,''),kind:isDateCols(cols)&&!db.tables.some(t=>t.kind==='date')?'date':/재료|판매가격/.test(j)?'recipe':/스택/.test(j)?'item':'',cols,rows:data}); ui.dbTab='t'+(db.tables.length-1); }
+    else{ const j=cols.join(' '); db.tables.push({name:file.name.replace(/\.[^.]+$/,''),kind:isDateCols(cols)&&!db.tables.some(t=>t.kind==='date')?'date':'',cols,rows:data}); ui.dbTab='t'+(db.tables.length-1); }
     db.tables.forEach(t=>{ if(t.kind==='date')fillOldDow(t); });
     touch(); render(); toast('CSV를 불러왔어요: '+data.length+'행 × '+cols.length+'열',true); });
 }
@@ -424,7 +424,7 @@ function tableView(ti){
   const colIn=ci=>{const e=h('input',{type:'text',value:t.cols[ci],style:'font-weight:700'});e.addEventListener('input',()=>{t.cols[ci]=e.value;touch();});return e;};
   return h('div',{class:'panel'},
     h('div',{class:'row',style:'margin-bottom:8px'},h('label',{class:'f'},'표시 이름',inp(t,'name',{rerender:true,style:'width:170px',ph:'표 이름'})),h('label',{class:'f'},'내보내기 파일 이름',h('span',{},inp(t,'file',{style:'width:170px',ph:fclean(t.name)||'table'}),' .csv')),
-      h('label',{},'용도 ',sel([['','없음'],['item','아이템 해금 대상'],['recipe','레시피 해금 대상'],['date','날짜 데이터 (달력 · 좌표 툴에 표시)']],t.kind||'',v=>{ if(v==='date')db.tables.forEach(x=>{if(x.kind==='date')x.kind='';}); t.kind=v; })),
+      h('label',{},'용도 ',sel([['','일반 표'],['date','날짜 데이터 (달력 · 좌표 툴에 표시)']],t.kind||'',v=>{ if(v==='date')db.tables.forEach(x=>{if(x.kind==='date')x.kind='';}); t.kind=v; })),
       h('span',{class:'muted grow'},t.rows.length+'행 × '+t.cols.length+'열'),
       h('button',{class:'sm',onclick:()=>importCSV(ti)},'CSV 다시 불러오기'),
       h('button',{class:'sm',onclick:()=>saveFile((t.name||'table')+'.csv','﻿'+toCSV([t.cols,...t.rows]))},'CSV 내보내기'),
@@ -435,16 +435,17 @@ function tableView(ti){
         h('td',{},h('button',{class:'sm ghost',title:'행 삭제',onclick:()=>{snap();t.rows.splice(ri,1);touch();render();toast('행을 삭제했어요',true);}},'✕')))))),
     h('div',{class:'row',style:'margin-top:8px'},h('button',{class:'pri sm',onclick:()=>{t.rows.push(t.cols.map(()=>''));touch();render();}},'+ 행 추가'),
       h('button',{class:'sm',onclick:()=>{const ci=t.cols.length;t.cols.push('새 열');t.rows.forEach(r=>r.push(''));touch();render();colModal({name:'새 열'},o=>{t.cols[ci]=o.name;t.meta[ci]={type:o.type,options:o.options};},()=>delCol(ci));}},'+ 열 추가'),
-      h('span',{class:'muted'},'CSV의 열과 값을 그대로 보관해요. 용도를 정하면 ID 열과 Name 열을 읽어 대화 효과의 드롭다운에 씁니다.')));
+      h('span',{class:'muted'},'CSV의 열과 값을 그대로 보관해요.')));
 }
 function dbView(){
   const isT=()=>/^t\d+$/.test(ui.dbTab);
-  if(!NK.some(k=>k[0]===ui.dbTab)&&!(isT()&&db.tables[+ui.dbTab.slice(1)]))ui.dbTab='normal';
+  if(!NK.some(k=>k[0]===ui.dbTab)&&ui.dbTab!=='visits'&&ui.dbTab!=='lines'&&!(isT()&&db.tables[+ui.dbTab.slice(1)]))ui.dbTab='normal';
   const kindOf=n=>n.kind||'normal';
   const tab=(k,l,n)=>h('button',{class:ui.dbTab===k?'on':'',onclick:()=>{ui.dbTab=k;render();}},l,h('span',{class:'muted'},' '+n));
-  const tabs=h('div',{class:'row',style:'margin-bottom:10px'},h('div',{class:'tabs',style:'margin-bottom:0'},NKL().map(([k,l])=>tab(k,l,db.npcs.filter(n=>kindOf(n)===k).length)),db.tables.map((t,i)=>tab('t'+i,t.name||'이름 없는 표',t.rows.length))),
+  const tabs=h('div',{class:'row',style:'margin-bottom:10px'},h('div',{class:'tabs',style:'margin-bottom:0'},NKL().map(([k,l])=>tab(k,l,db.npcs.filter(n=>kindOf(n)===k).length)),tab('visits','날짜별 방문자',db.visits.length),tab('lines','대사',db.lines.length),db.tables.map((t,i)=>tab('t'+i,t.name||'이름 없는 표',t.rows.length))),
     h('button',{class:'pri',onclick:()=>importCSV()},'+ CSV 불러오기'));
   if(isT())return h('div',{},tabs,tableView(+ui.dbTab.slice(1)));
+  if(ui.dbTab==='visits'||ui.dbTab==='lines')return h('div',{},tabs,talkTable(ui.dbTab));
   const rows=db.npcs.filter(n=>kindOf(n)===ui.dbTab), ids=db.npcs.map(r=>r.id), dup=new Set(ids.filter((x,i)=>ids.indexOf(x)!==i));
   const xc=db.ncols[ui.dbTab]||(db.ncols[ui.dbTab]=[]);
   const addCol=()=>{const c={key:'c'+(db.nseq++),name:'새 열',type:'text',options:[]};xc.push(c);touch();render();colModal(c,o=>Object.assign(c,o),()=>xc.splice(xc.indexOf(c),1));};
@@ -461,9 +462,9 @@ function dbView(){
           h('td',{},sel(NKL(),kindOf(r),v=>r.kind=v)),
           h('td',{},h('button',{class:'sm ghost',title:'삭제',onclick:()=>{snap();db.npcs.splice(db.npcs.indexOf(r),1);touch();render();toast('삭제했어요',true);}},'✕')))))),
       rows.length?null:h('p',{class:'muted'},'아직 없어요.'),
-      h('div',{class:'row',style:'margin-top:8px'},h('button',{class:'pri',onclick:()=>{const nid=String(Math.max(0,...db.npcs.map(n=>/^\d+$/.test(n.id)?+n.id:0))+1); db.npcs.push({id:nid,code:'',name:'',faces:'기본',kind:ui.dbTab});touch();render();}},'+ 추가'),h('button',{onclick:addCol},'+ 열 추가'),
+      h('div',{class:'row',style:'margin-top:8px'},h('button',{class:'pri',onclick:()=>{let i=1; while(db.npcs.some(n=>n.id==='NewNpc'+i))i++; db.npcs.push({id:'NewNpc'+i,num:'',name:'',faces:'기본',kind:ui.dbTab});touch();render();}},'+ 추가'),h('button',{onclick:addCol},'+ 열 추가'),
         dup.size?h('span',{class:'tag pk'},'겹치는 ID가 있어요 (분류가 달라도 ID는 하나씩)'):null,
-        h('span',{class:'muted'},'ID는 숫자로 써 주세요(유니티 ID가 int). 영어 이름의 기본 열은 유니티 임포터가 순서대로 읽어서 고정이고, 그 뒤로 열을 자유롭게 추가할 수 있어요.'))));
+        h('span',{class:'muted'},'한글 이름은 여기에만 적고, 방문자·대사 표에서는 이름표(ID)로만 불러요. 이름표를 바꾸면 방문자·대사 표에서 ⚠로 표시됩니다. 유니티 ID(숫자)와 영어 이름의 기본 열은 유니티 임포터용이에요.'))));
 }
 
 /* ---------- 좌표 설정 툴 (NPC 좌표 설정기 이식, 캘린더 부분 제외) ---------- */
@@ -614,103 +615,106 @@ function coordView(){
   return h('div',{class:'dlgwrap'},head,h('div',{class:'row',style:'margin-bottom:10px'},dateChips(ui.date)),h('div',{class:'coordwrap'},left,mapPane,right));
 }
 
-/* ---------- 대화 툴 ---------- */
-function newDialog(base){
-  let i=db.dialogs.length+1, id; do{ id='dialog_'+String(i++).padStart(3,'0'); }while(db.dialogs.some(d=>d.id===id));
-  const npc=ui.fNpc||(db.npcs[0]?db.npcs[0].id:'');
-  const d=base?Object.assign(JSON.parse(JSON.stringify(base)),{id,title:(base.title||'')+' 복사',status:'draft'}):
-    {id,title:'',npc,status:'draft',entry:'cond',seq:2,cond:{visit:'',affMin:'',affMax:'',mood:'',dates:ui.date?[ui.date]:[],flags:[]},lines:[{n:1,speaker:npc,face:facesOf(npc)[0]||'',text:'',memo:'',effects:[],choices:[]}]};
-  db.dialogs.push(d); ui.dlg=id; ui.line=0; touch(); render();
-}
-function openDlg(id,line){ ui.tool='dialog'; ui.tab='edit'; ui.dlg=id; ui.line=line||0; ui.q='';ui.fNpc='';ui.fStatus='';ui.fFlag=''; render(); }
-function dlgMatches(d){
-  if(ui.fNpc&&d.npc!==ui.fNpc)return false; if(ui.fStatus&&d.status!==ui.fStatus)return false;
-  if(ui.q){ const q=ui.q.toLowerCase(); if(!(d.id+' '+d.title+' '+d.lines.map(l=>l.text+' '+l.memo+' '+l.choices.map(c=>c.text).join(' ')).join(' ')).toLowerCase().includes(q))return false; }
-  return true;
-}
-function condSummary(d){ const c=d.cond,p=[]; if(d.entry==='link')p.push('분기로만 진입'); if(c.visit!=='')p.push(c.visit+'번째 방문'); if(c.affMin!==''||c.affMax!=='')p.push('호감도 '+(c.affMin===''?'':c.affMin)+'~'+(c.affMax===''?'':c.affMax));
-  if(c.dates.length)p.push(c.dates.map(dl).join(', ')); if(c.mood)p.push('기분 '+c.mood); if(c.flags.length)p.push('플래그 '+c.flags.join(', ')); return p.join(' · ')||'조건 없음 (언제나)'; }
-function dialogView(){
-  const issues=validate(), errN=issues.filter(i=>i.lv==='err').length;
-  const tabs=h('div',{class:'tabs'},[['edit','편집'],['flow','스토리 흐름'],['check','검증']].map(([k,l])=>h('button',{class:ui.tab===k?'on':'',onclick:()=>{ui.tab=k;render();}},l,k==='check'&&issues.length?h('span',{class:'badge',style:errN?'':'background:var(--warn);color:var(--ink)'},issues.length):null)),
-    h('span',{class:'muted',style:'align-self:center'},['초안 '+db.dialogs.filter(d=>d.status==='draft').length,'검수 필요 '+db.dialogs.filter(d=>d.status==='review').length,'확정 '+db.dialogs.filter(d=>d.status==='final').length].join(' · ')));
-  if(ui.tab==='flow')return h('div',{},tabs,flowView());
-  if(ui.tab==='check')return h('div',{},tabs,checkView(issues));
-  if(!curDlg()&&db.dialogs[0])ui.dlg=db.dialogs[0].id;
-  return h('div',{class:'dlgwrap'},tabs,h('div',{class:'dlg'},listCol(),editCol(issues),previewCol()));
-}
-function listCol(){
-  const q=h('input',{type:'text',placeholder:'검색 (ID · 제목 · 대사 · 메모)',value:ui.q,style:'width:100%'});
-  const box=h('div',{});
-  const fill=()=>{ const ds=db.dialogs.filter(dlgMatches);
-    put(box,ds.map(d=>h('div',{class:'li'+(d.id===ui.dlg?' on':''),onclick:()=>{ui.dlg=d.id;ui.line=0;render();}},h('span',{class:'st '+d.status,title:STATUS[d.status]}),
-      h('div',{class:'grow'},d.id,h('small',{},(speakerName(d.npc))+(d.title?' · '+d.title:''))))), ds.length?null:h('p',{class:'muted'},db.dialogs.length?'조건에 맞는 대화가 없어요.':'아직 대화가 없어요.')); };
-  q.addEventListener('input',()=>{ui.q=q.value;fill();}); fill();
-  return h('div',{class:'panel','data-sc':'list'},
-    h('div',{class:'row',style:'margin-bottom:6px'},h('h3',{class:'grow'},'대화 목록'),h('button',{class:'pri sm',onclick:()=>newDialog()},'+ 새 대화')),
-    q,
-    h('div',{class:'row',style:'margin:6px 0'},
-      sel([['','손님 전체'],...db.npcs.map(n=>[n.id,n.name||n.id])],ui.fNpc,v=>ui.fNpc=v,'flex:1'),
-      sel([['','상태 전체'],...Object.entries(STATUS)],ui.fStatus,v=>ui.fStatus=v,'flex:1')),
-    box);
-}
-function fxEditor(arr){
-  return h('div',{class:'sub2'},arr.map((f,i)=>h('div',{class:'row'},h('span',{class:'tag sky'},'효과'),
-      sel(Object.entries(FX),f.type,v=>{f.type=v;f.target='';f.value=v==='flag'?true:(v==='affinity'?1:1);}),
-      f.type==='affinity'?sel(db.npcs.map(n=>[n.id,n.name||n.id]),f.target,v=>f.target=v):
-      f.type==='item'?sel(tableRows('item').map(x=>[x.id,x.name+' ('+x.id+')']),f.target,v=>f.target=v):sel(tableRows('recipe').map(x=>[x.id,x.name+' ('+x.id+')']),f.target,v=>f.target=v),
-      f.type==='affinity'?inp(f,'value',{type:'number',title:'더할 값 (음수 가능)'}):null,
-      h('button',{class:'sm',onclick:()=>{arr.splice(i,1);touch();render();}},'✕'))),
-    h('div',{},h('button',{class:'sm',onclick:()=>{arr.push({type:'affinity',target:'',value:1});touch();render();}},'+ 효과')));
-}
+/* ---------- 대화 툴 (날짜 → 방문자 → 대사) ---------- */
+const MNAME={4:'April',6:'June',7:'July',8:'August'};
+const dcode=k=>(DM[k]&&DM[k].code)||(()=>{const [m,d]=String(k).split('-');return (MNAME[m]||('M'+m))+d;})(); // 날짜ID (April5, June1 …)
+const dkeyOf=code=>ALLDATES.find(k=>dcode(k)===String(code).trim())||'';
+const dord=k=>{const i=ALLDATES.indexOf(k);return i<0?9999:i;};
+const byOrder=(a,b)=>(+a.order||0)-(+b.order||0);
+const visitsOf=k=>db.visits.filter(v=>v.d===k).sort(byOrder);
+const linesOf=(k,npc)=>db.lines.filter(l=>l.d===k&&l.npc===npc).sort(byOrder);
+const renum=arr=>arr.forEach((x,i)=>x.order=i+1);
+const curLines=()=>ui.date&&ui.vnpc?linesOf(ui.date,ui.vnpc):null;
+const curDlg=()=>{const L=curLines();return L?{lines:L}:null;};
+const npcLabel=id=>id==='player'?'플레이어':(npcOf(id)?(npcOf(id).name||id)+' ('+id+')':'⚠ '+id);
 function showTip(el){ const t=$('#tip'); t.innerHTML='<div style="margin-bottom:4px">제어 문자</div>'+
   [['\\N[손님ID]','손님 이름으로 대체'],['\\C[n]','이후 글자 색 ('+TEXTCOLNAME.map((n,i)=>i+' '+n).join(', ')+')'],['\\{','글자 크기 한 단계 키움'],['\\}','글자 크기 한 단계 줄임'],['\\\\','문자 \\ 로 대체'],['\\.','1/4초 기다림'],['\\|','1초 기다림'],['\\!','버튼 입력을 기다림'],['\\>','같은 줄 남은 글자를 한꺼번에 표시'],['\\<','한꺼번에 표시 취소'],['\\^','표시 후 입력을 기다리지 않음']]
   .map(([a,b])=>'<div><b>'+a.replace(/</g,'&lt;')+'</b>'+b+'</div>').join('');
   t.style.display='block'; const r=el.getBoundingClientRect(), th=t.offsetHeight; t.style.left=Math.max(8,Math.min(r.left,innerWidth-350))+'px'; t.style.top=(r.bottom+th+8<innerHeight?r.bottom+6:Math.max(8,r.top-th-6))+'px'; }
 function hideTip(){ clearTimeout(showTip.t); $('#tip').style.display='none'; }
-function editCol(issues){
-  const d=curDlg();
-  if(!d) return h('div',{class:'panel'},h('p',{class:'muted'},'왼쪽에서 대화를 고르거나 새 대화를 만들어 주세요.'),h('button',{class:'pri',onclick:()=>newDialog()},'+ 새 대화'));
-  const c=d.cond, mine=issues.filter(i=>i.dlg===d.id);
-  const idIn=h('input',{type:'text',value:d.id,style:'width:100%'});
-  idIn.addEventListener('change',()=>{ const v=idIn.value.trim(); if(!v||db.dialogs.some(x=>x!==d&&x.id===v)){toast(v?'이미 있는 대화 ID예요':'ID는 비울 수 없어요');idIn.value=d.id;return;}
-    const old=d.id; d.id=v; for(const x of db.dialogs)for(const l of x.lines)for(const ch of l.choices)if(ch.next===old)ch.next=v; ui.dlg=v; touch(); render(); });
-  const lines=d.lines.map((l,i)=>{
-    const ta=inp(l,'text',{area:true,ph:'대사를 입력하세요. 마우스를 잠깐 올려 두면 제어 문자 설명이 떠요.',oninput:()=>{ui.line=i;pvLoad(true);}});
-    ta.addEventListener('focus',()=>{ if(ui.line!==i){ui.line=i;document.querySelectorAll('.line').forEach((e,j)=>e.classList.toggle('on',j===i));pvLoad(true);} });
+function dialogView(){
+  if(!ui.date){ const ds=[...new Set(db.visits.map(v=>v.d))].sort((a,b)=>dord(a)-dord(b));
+    return h('div',{class:'panel'},h('h2',{},'대화 툴'),h('p',{},'왼쪽 달력에서 날짜를 누르면 그날 방문자와 대사를 쓸 수 있어요.'),
+      ds.length?h('div',{class:'row'},h('span',{class:'muted'},'방문자가 있는 날짜'),ds.map(k=>h('button',{class:'sm',onclick:()=>{ui.date=k;render();}},dlw(k)))):null); }
+  const vs=visitsOf(ui.date); if(!vs.some(v=>v.npc===ui.vnpc)){ui.vnpc=vs[0]?vs[0].npc:null;ui.line=0;}
+  return h('div',{class:'dlgwrap'},h('div',{class:'row',style:'margin-bottom:10px'},h('h2',{},dlw(ui.date)),h('span',{class:'tag sky',title:'날짜ID'},dcode(ui.date)),dateChips(ui.date)),
+    h('div',{class:'dlg'},visitCol(vs),editCol(),previewCol()));
+}
+function visitCol(vs){
+  const rest=db.npcs.filter(n=>!vs.some(v=>v.npc===n.id));
+  const pick=h('select',{style:'flex:1;min-width:0'},rest.map(n=>h('option',{value:n.id},(n.name||n.id)+' ('+n.id+')')));
+  const move=(i,dir)=>{const j=i+dir;if(j<0||j>=vs.length)return;[vs[i],vs[j]]=[vs[j],vs[i]];renum(vs);touch();render();};
+  return h('div',{class:'panel','data-sc':'list'},
+    h('div',{class:'row',style:'margin-bottom:6px'},h('h3',{class:'grow'},'방문자 ('+vs.length+')')),
+    vs.map((v,i)=>h('div',{class:'li'+(v.npc===ui.vnpc?' on':''),onclick:e=>{ if(e.target.closest('button'))return; ui.vnpc=v.npc;ui.line=0;render(); }},
+      h('span',{class:'tag'},i+1),
+      h('div',{class:'grow'},npcOf(v.npc)?(npcOf(v.npc).name||v.npc):'⚠ 없는 NPC',h('small',{},v.npc+' · 대사 '+linesOf(ui.date,v.npc).length+'줄')),
+      h('button',{class:'sm ghost',title:'순서 위로',onclick:()=>move(i,-1)},'↑'),h('button',{class:'sm ghost',title:'순서 아래로',onclick:()=>move(i,1)},'↓'),
+      h('button',{class:'sm ghost',title:'이 날 방문에서 빼기',onclick:()=>{snap();db.visits.splice(db.visits.indexOf(v),1);db.lines=db.lines.filter(l=>!(l.d===ui.date&&l.npc===v.npc));renum(visitsOf(ui.date));touch();render();toast('방문자와 그날 대사를 지웠어요',true);}},'✕'))),
+    vs.length?null:h('p',{class:'muted'},'이 날짜에는 아직 방문자가 없어요.'),
+    rest.length?h('div',{class:'row',style:'margin-top:8px'},pick,h('button',{class:'pri sm',onclick:()=>{db.visits.push({d:ui.date,npc:pick.value,order:vs.length+1});ui.vnpc=pick.value;ui.line=0;touch();render();}},'+ 방문자')):
+      h('p',{class:'muted'},db.npcs.length?'모든 NPC가 이미 방문자로 들어 있어요.':'데이터베이스에 NPC를 먼저 추가해 주세요.'));
+}
+function editCol(){
+  const L=curLines();
+  if(!L) return h('div',{class:'panel'},h('p',{class:'muted'},'왼쪽에서 방문자를 추가하거나 골라 주세요.'));
+  const who=ui.vnpc, others=db.npcs.filter(n=>n.id!==who);
+  const spOpts=[[who,npcLabel(who)],['player','플레이어 (player)'],...others.map(n=>[n.id,npcLabel(n.id)])];
+  const select=i=>{ if(ui.line!==i){ui.line=i;document.querySelectorAll('.line').forEach((e,j)=>e.classList.toggle('on',j===i));pvLoad(true);} };
+  const cards=L.map((l,i)=>{
+    const warn=h('div',{});
+    const check=()=>{ const lay=layout(parseText(l.text).toks,db.preview); put(warn,lay.lines>db.preview.rows?h('div',{class:'errbox'},'글자 넘침: '+lay.lines+'줄 (말풍선 '+db.preview.rows+'줄)'):null,String(l.text||'').trim()?null:h('div',{class:'warnbox'},'빈 대사예요')); };
+    const ta=inp(l,'text',{area:true,ph:'대사를 입력하세요. 마우스를 잠깐 올려 두면 제어 문자 설명이 떠요.',oninput:()=>{ui.line=i;pvLoad(true);check();}});
+    ta.addEventListener('focus',()=>select(i));
     ta.addEventListener('mouseenter',()=>{clearTimeout(showTip.t);showTip.t=setTimeout(()=>showTip(ta),800);}); ta.addEventListener('mouseleave',hideTip);
-    const mv=(dir)=>{const j=i+dir;if(j<0||j>=d.lines.length)return;[d.lines[i],d.lines[j]]=[d.lines[j],d.lines[i]];ui.line=j;touch();render();};
-    const li=mine.filter(x=>x.line===i);
-    return h('div',{class:'line'+(ui.line===i?' on':''),onclick:e=>{ if(ui.line!==i&&!e.target.closest('button,select')){ui.line=i;document.querySelectorAll('.line').forEach((el,j)=>el.classList.toggle('on',j===i));pvLoad(true);} }},
-      h('div',{class:'hd'},h('span',{class:'tag'},i+1),
-        sel([['player','플레이어'],...db.npcs.map(n=>[n.id,n.name||n.id])],l.speaker,v=>{l.speaker=v;l.face=facesOf(v)[0]||'';ui.line=i;}),
+    const mv=dir=>{const j=i+dir;if(j<0||j>=L.length)return;[L[i],L[j]]=[L[j],L[i]];renum(L);ui.line=j;touch();render();};
+    check();
+    return h('div',{class:'line'+(ui.line===i?' on':''),onclick:e=>{ if(!e.target.closest('button,select'))select(i); }},
+      h('div',{class:'hd'},h('span',{class:'tag',title:'순서'},i+1),
+        sel(spOpts,l.speaker,v=>{l.speaker=v;l.face=facesOf(v)[0]||'';ui.line=i;}),
         l.speaker==='player'?null:sel(facesOf(l.speaker),l.face,v=>{l.face=v;ui.line=i;}),
-        h('span',{class:'grow'}),h('span',{class:'muted',style:'flex-basis:100%;order:9',title:'로컬라이징 키 (자동 생성)'},'키: '+lineKey(d,l)),
+        h('span',{class:'grow'}),
         h('button',{class:'sm',onclick:()=>mv(-1)},'↑'),h('button',{class:'sm',onclick:()=>mv(1)},'↓'),
-        h('button',{class:'sm',onclick:()=>{snap();d.lines.splice(i,1);ui.line=Math.max(0,i-1);touch();render();toast('줄을 삭제했어요',true);}},'✕')),
-      ta,
-      h('div',{class:'row',style:'margin-top:4px'},h('span',{class:'tag moss'},'메모'),inp(l,'memo',{cls:'grow',ph:'개발자용 코멘트 (예: 여기 연출 넣어줘)'})),
-      l.effects.length?fxEditor(l.effects):null,
-      l.choices.length?h('div',{class:'sub2 ch'},l.choices.map((ch,ci)=>h('div',{},h('div',{class:'row'},h('span',{class:'tag pk'},'선택지 '+(ci+1)),inp(ch,'text',{cls:'grow',ph:'선택지 문구',oninput:()=>pvChoices()}),'→',
-          sel([['','(대화 끝)'],...db.dialogs.filter(x=>x!==d).map(x=>[x.id,x.id+(x.title?' · '+x.title:'')])],ch.next,v=>ch.next=v,'max-width:200px'),
-          ch.next&&db.dialogs.some(x=>x.id===ch.next)?h('button',{class:'sm',title:'연결된 대화로 이동',onclick:()=>{ui.dlg=ch.next;ui.line=0;render();}},'이동'):null,
-          h('button',{class:'sm',onclick:()=>{ch.effects.push({type:'affinity',target:d.npc,value:1});touch();render();}},'+ 효과'),
-          h('button',{class:'sm',onclick:()=>{l.choices.splice(ci,1);touch();render();}},'✕')),
-          ch.effects.length?fxEditor(ch.effects):null))):null,
-      h('div',{class:'row',style:'margin-top:6px'},
-        l.effects.length?null:h('button',{class:'sm',onclick:()=>{l.effects.push({type:'affinity',target:d.npc,value:1});touch();render();}},'+ 효과'),
-        h('button',{class:'sm',onclick:()=>{l.choices.push({text:'',next:'',effects:[]});touch();render();}},'+ 선택지')),
-      li.map(x=>h('div',{class:x.lv==='err'?'errbox':'warnbox'},(x.lv==='err'?'오류: ':'경고: ')+x.msg)));
+        h('button',{class:'sm',onclick:()=>{snap();db.lines.splice(db.lines.indexOf(l),1);renum(linesOf(ui.date,who));ui.line=Math.max(0,i-1);touch();render();toast('줄을 삭제했어요',true);}},'✕')),
+      ta,warn);
   });
-  return h('div',{'data-sc':'edit'},h('div',{class:'panel'},
-    h('div',{class:'row'},h('label',{class:'f',style:'flex:1 1 150px'},'대화 ID',idIn),h('label',{class:'f',style:'flex:1 1 150px'},'제목 (정리용)',inp(d,'title',{rerender:true})),
-      h('label',{class:'f'},'손님',sel(db.npcs.map(n=>[n.id,n.name||n.id]),d.npc,v=>d.npc=v)),
-      h('label',{class:'f'},'작성 상태',sel(Object.entries(STATUS),d.status,v=>d.status=v))),
-    h('div',{class:'row',style:'margin-top:8px'},h('button',{class:'sm',onclick:()=>newDialog(d)},'복제'),
-      h('button',{class:'sm pk',onclick:()=>{snap();db.dialogs.splice(db.dialogs.indexOf(d),1);ui.dlg=db.dialogs[0]?db.dialogs[0].id:null;ui.line=0;touch();render();toast('대화를 삭제했어요',true);}},'대화 삭제'),
-      mine.filter(x=>x.line==null).map(x=>h('span',{class:'tag '+(x.lv==='err'?'pk':''),style:x.lv==='err'?'':'background:#fff6d9;color:#8a6a10'},x.msg)))),
-    lines,
-    h('div',{style:'margin:10px 0 30px'},h('button',{class:'pri',onclick:()=>{const last=d.lines[d.lines.length-1];const sp=last?last.speaker:d.npc;d.lines.push({n:d.seq++,speaker:sp,face:last&&last.speaker===sp?last.face:(facesOf(sp)[0]||''),text:'',memo:'',effects:[],choices:[]});ui.line=d.lines.length-1;touch();render();}},'+ 줄 추가')));
+  return h('div',{'data-sc':'edit'},
+    h('div',{class:'panel'},h('div',{class:'row'},h('h3',{},npcLabel(who)),h('span',{class:'muted grow'},dlw(ui.date)+' · 대사 '+L.length+'줄 · 위에서부터 순서대로 재생돼요'))),
+    cards,
+    h('div',{style:'margin:10px 0 30px'},h('button',{class:'pri',onclick:()=>{const last=L[L.length-1],sp=last?last.speaker:who;db.lines.push({d:ui.date,npc:who,order:L.length+1,speaker:sp,face:last&&last.speaker===sp?last.face:(facesOf(sp)[0]||''),text:''});ui.line=L.length;touch();render();}},'+ 줄 추가')));
+}
+
+/* ---------- 방문자 · 대사 표 (데이터베이스 탭) ---------- */
+const sortedVisits=()=>[...db.visits].sort((a,b)=>dord(a.d)-dord(b.d)||byOrder(a,b));
+const sortedLines=()=>{ const vo={}; db.visits.forEach(v=>vo[v.d+'|'+v.npc]=+v.order||0); return [...db.lines].sort((a,b)=>dord(a.d)-dord(b.d)||((vo[a.d+'|'+a.npc]||999)-(vo[b.d+'|'+b.npc]||999))||(a.npc<b.npc?-1:a.npc>b.npc?1:0)||byOrder(a,b)); };
+const NL=s=>String(s??'').replace(/\r?\n/g,'\\n'); // CSV 한 줄 = 대사 한 줄이 되도록 줄바꿈은 \n 글자로 내보낸다
+const visitsCSV=()=>toCSV([['날짜ID','NPC ID','방문 순서'],...sortedVisits().map(v=>[dcode(v.d),v.npc,v.order])]);
+const linesCSV=()=>toCSV([['날짜ID','NPC ID','순서','화자 ID','표정','대사 텍스트'],...sortedLines().map(l=>[dcode(l.d),l.npc,l.order,l.speaker,l.speaker==='player'?'':(l.face||''),NL(l.text)])]);
+function importTalkCSV(which){
+  pickFile('.csv,text/csv','csv',text=>{ const rows=csvParse(text).filter(r=>r.some(c=>String(c).trim()!=='')).slice(1); let bad=0; const out=[];
+    for(const r of rows){ const d=dkeyOf(r[0]); if(!d||!String(r[1]||'').trim()){bad++;continue;}
+      out.push(which==='visits'?{d,npc:String(r[1]).trim(),order:+r[2]||out.length+1}:{d,npc:String(r[1]).trim(),order:+r[2]||out.length+1,speaker:String(r[3]||r[1]).trim(),face:String(r[4]||'').trim(),text:String(r[5]??'').replace(/\\n/g,'\n')}); }
+    snap(); db[which]=out; touch(); render(); toast(out.length+'행을 불러왔어요'+(bad?' · 날짜ID를 못 찾아 건너뛴 줄 '+bad+'개':''),true); });
+}
+function talkTable(which){
+  const dateOpts=ALLDATES.map(k=>[k,dcode(k)]), npcIds=db.npcs.map(n=>n.id), isV=which==='visits';
+  let rows=isV?sortedVisits():sortedLines(); const all=rows.length; if(ui.date)rows=rows.filter(r=>r.d===ui.date);
+  const del=r=>h('button',{class:'sm ghost',title:'행 삭제',onclick:()=>{snap();db[which].splice(db[which].indexOf(r),1);touch();render();toast('행을 삭제했어요',true);}},'✕');
+  const num=r=>{const e=h('input',{type:'number',value:r.order,style:'min-width:60px'});e.addEventListener('input',()=>{r.order=e.value===''?'':+e.value;touch();});e.addEventListener('change',render);return e;};
+  const txt=r=>{const e=h('input',{type:'text',value:r.text,style:'min-width:360px'});e.addEventListener('input',()=>{r.text=e.value;touch();});return e;};
+  const head=isV?['날짜ID','NPC ID','방문 순서']:['날짜ID','NPC ID','순서','화자 ID','표정','대사 텍스트'];
+  return h('div',{class:'panel'},
+    h('div',{class:'row',style:'margin-bottom:8px'},h('h3',{},isV?'날짜별 방문자':'대사'),
+      h('span',{class:'muted grow'},ui.date?dcode(ui.date)+'만 보는 중 ('+rows.length+' / 전체 '+all+'행) · 달력에서 날짜를 해제하면 전체가 보여요':'전체 '+all+'행 · 달력에서 날짜를 고르면 그날만 보여요'),
+      h('button',{class:'sm',onclick:()=>importTalkCSV(which)},'CSV 불러오기 (덮어쓰기)'),
+      h('button',{class:'sm',onclick:()=>saveFile(exportFiles()[isV?'date':'dlg'].find(f=>f.key===which).file+'.csv','﻿'+(isV?visitsCSV():linesCSV()))},'CSV 내보내기')),
+    h('div',{class:'gridwrap','data-sc':'tbl'},h('table',{class:'grid'},h('tr',{},head.map(x=>h('th',{style:'padding:4px 8px'},x)),h('th',{},'')),
+      rows.map(r=>h('tr',{},h('td',{},sel(dateOpts,r.d,v=>r.d=v)),h('td',{},sel(npcIds,r.npc,v=>r.npc=v)),h('td',{},num(r)),
+        isV?null:[h('td',{},sel(['player',...npcIds],r.speaker,v=>{r.speaker=v;if(!facesOf(v).includes(r.face))r.face=facesOf(v)[0]||'';})),h('td',{},r.speaker==='player'?'':sel(facesOf(r.speaker),r.face,v=>r.face=v)),h('td',{},txt(r))],
+        h('td',{},del(r)))))),
+    h('div',{class:'row',style:'margin-top:8px'},h('button',{class:'pri sm',onclick:()=>{ const d=ui.date||ALLDATES[0], npc=npcIds[0]||''; if(!npc){toast('NPC를 먼저 추가해 주세요');return;}
+        if(isV)db.visits.push({d,npc,order:visitsOf(d).length+1}); else db.lines.push({d,npc,order:linesOf(d,npc).length+1,speaker:npc,face:facesOf(npc)[0]||'',text:''}); touch();render(); }},'+ 행 추가'),
+      h('span',{class:'muted'},isV?'날짜ID와 NPC ID는 드롭다운으로만 골라요. 대화 툴에서 방문자를 추가하면 여기에 쌓입니다.':'대화 툴에서 쓴 대사가 여기에 한 줄씩 쌓여요. 긴 대사는 대화 툴에서 고치는 게 편해요.')));
 }
 
 /* ---------- 미리보기 ---------- */
@@ -731,7 +735,7 @@ function parseText(raw){
 }
 const mctx=document.createElement('canvas').getContext('2d');
 const imgCache={};
-function getImg(url){ if(!url)return null; let im=imgCache[url]; if(!im){ im=imgCache[url]=new Image(); im.onload=()=>{ if(db&&ui.tool==='dialog'&&ui.tab==='edit')render(); }; im.src=url; } return im.complete&&im.naturalWidth?im:null; }
+function getImg(url){ if(!url)return null; let im=imgCache[url]; if(!im){ im=imgCache[url]=new Image(); im.onload=()=>{ if(db&&ui.tool==='dialog')render(); }; im.src=url; } return im.complete&&im.naturalWidth?im:null; }
 function standUrl(l){ const P=db.preview, m=P.stands||{}; if(!l)return P.standImg||''; return m[l.speaker+'|'+(l.speaker==='player'?'':(l.face||''))]||P.standImg||''; }
 const nv=(v,d)=>v===''||v==null||isNaN(+v)?d:+v;
 function geo(P,l){ // 말풍선·스탠딩·글자 위치 계산 (모두 실제 px)
@@ -802,8 +806,7 @@ function pvInfo(){
   if(pv.unknown.length)out.push(h('div',{class:'errbox'},'없는 손님 ID: '+[...new Set(pv.unknown)].join(', ')));
   put(box,...out);
 }
-function pvChoices(){ const box=$('#pvch'); if(!box)return; const d=curDlg(), l=d&&d.lines[ui.line];
-  put(box,...(l?l.choices:[]).map(ch=>h('button',{onclick:()=>{ if(ch.next&&db.dialogs.some(x=>x.id===ch.next)){ui.dlg=ch.next;ui.line=0;render();pvLoad(false);} else toast(ch.next?'연결된 대화가 없어요':'여기서 대화가 끝나요'); }},'▸ '+(ch.text||'(빈 선택지)'),h('span',{class:'muted'},ch.next?'  → '+ch.next:'  (끝)')))); }
+function pvChoices(){ const box=$('#pvch'); if(box)put(box); }
 function previewCol(){
   const P=db.preview, d=curDlg(), l=d&&d.lines[ui.line];
   const cv=h('canvas',{id:'pvc',onclick:pvClick,title:'누르면 다음으로 넘어가요'});
@@ -841,82 +844,24 @@ let fontName='';
 async function loadFont(url,save,name){ try{ const ff=new FontFace('MerongGame','url('+url+')'); await ff.load(); document.fonts.add(ff);
     FONT='"MerongGame",'+FONT.replace('"MerongGame",',''); fontName=name||'불러온 폰트';
     if(save){ try{localStorage.setItem(LSF,JSON.stringify({url,name}));}catch(e){ toast('폰트는 적용됐지만 용량이 커서 다음 접속 때는 다시 불러와야 해요'); } }
-    if(db){ const f=$('#fontname'); if(f)f.textContent=fontName; if(ui.tool==='dialog'&&ui.tab==='edit')pvLoad(true); }
+    if(db){ const f=$('#fontname'); if(f)f.textContent=fontName; if(ui.tool==='dialog')pvLoad(true); }
   }catch(e){ toast('폰트를 읽지 못했어요'); } }
-
-/* ---------- 검증 ---------- */
-function validate(){
-  const out=[], add=(lv,d,line,msg)=>out.push({lv,dlg:d.id,line,msg});
-  const ids=new Set(db.dialogs.map(d=>d.id)), items=new Set(tableRows('item').map(f=>f.id)), recipes=new Set(tableRows('recipe').map(f=>f.id)), npcs=new Set(db.npcs.map(n=>n.id));
-  const linked=new Set(), setFlags=new Set();
-  const allFx=d=>d.lines.flatMap(l=>[...l.effects,...l.choices.flatMap(c=>c.effects)]);
-  for(const d of db.dialogs){ for(const l of d.lines)for(const c of l.choices)if(c.next)linked.add(c.next); for(const f of allFx(d))if(f.type==='flag'&&f.value!==false)setFlags.add(f.target); }
-  const fxCheck=(d,i,f,where)=>{ const ok=f.type==='affinity'?npcs.has(f.target):f.type==='item'?items.has(f.target):recipes.has(f.target);
-    if(!f.target)add('err',d,i,where+FX[f.type]+' 효과의 대상이 비어 있어요'); else if(!ok)add('err',d,i,where+FX[f.type]+' 효과의 대상 "'+f.target+'" 이(가) 데이터베이스에 없어요'); };
-  for(const d of db.dialogs){ const c=d.cond;
-    if(db.dialogs.filter(x=>x.id===d.id).length>1)add('err',d,null,'대화 ID가 겹쳐요');
-    if(!npcs.has(d.npc))add('err',d,null,'손님 "'+(d.npc||'')+'" 이(가) 데이터베이스에 없어요');
-    if(!d.lines.length)add('warn',d,null,'줄이 하나도 없어요');
-    d.lines.forEach((l,i)=>{
-      if(!String(l.text||'').trim())add('warn',d,i,'빈 줄이에요');
-      if(l.speaker!=='player'){ if(!npcs.has(l.speaker))add('err',d,i,'화자 "'+(l.speaker||'')+'" 이(가) 데이터베이스에 없어요'); else if(l.face&&!facesOf(l.speaker).includes(l.face))add('err',d,i,'표정 "'+l.face+'" 이(가) 이 손님에게 없어요'); }
-      const p=parseText(l.text); if(p.unknown.length)add('err',d,i,'없는 손님 ID: '+[...new Set(p.unknown)].join(', '));
-      const lay=layout(p.toks,db.preview); if(lay.lines>db.preview.rows)add('warn',d,i,'글자 넘침 ('+lay.lines+'줄 / 말풍선 '+db.preview.rows+'줄)');
-      l.effects.forEach(f=>fxCheck(d,i,f,''));
-      l.choices.forEach((ch,ci)=>{ const w='선택지 '+(ci+1)+': '; if(!String(ch.text||'').trim())add('warn',d,i,w+'문구가 비어 있어요'); if(ch.next&&!ids.has(ch.next))add('err',d,i,w+'연결된 대화 "'+ch.next+'" 이(가) 없어요'); ch.effects.forEach(f=>fxCheck(d,i,f,w)); });
-      if(l.choices.length&&i<d.lines.length-1)add('warn',d,i,'선택지 뒤에 줄이 더 있어요. 분기 후 이 줄들이 나오는지 확인해 주세요');
-    }); }
-  return out;
-}
-function checkView(issues){
-  return h('div',{class:'panel'},h('div',{class:'row',style:'margin-bottom:6px'},h('h2',{},'검증'),h('span',{class:'tag pk'},'오류 '+issues.filter(i=>i.lv==='err').length),h('span',{class:'tag',style:'background:#fff6d9'},'경고 '+issues.filter(i=>i.lv==='warn').length)),
-    issues.length?issues.map(x=>h('div',{class:'iss',onclick:()=>openDlg(x.dlg,x.line)},h('span',{class:'tag '+(x.lv==='err'?'pk':''),style:x.lv==='err'?'':'background:#fff6d9;color:#8a6a10'},x.lv==='err'?'오류':'경고'),h('span',{style:'min-width:150px'},x.dlg+(x.line!=null?' · '+(x.line+1)+'번 줄':'')),h('span',{class:'grow'},x.msg))):h('p',{},'문제가 없어요.'),
-    h('p',{class:'muted'},'확인하는 것: 끊긴 분기, 없는 손님·표정·아이템·레시피, 빈 줄, 말풍선 넘침. 항목을 누르면 그 줄로 이동해요.'));
-}
-
-/* ---------- 스토리 흐름 ---------- */
-function flowView(){
-  if(!ui.flowNpc||!npcOf(ui.flowNpc))ui.flowNpc=db.npcs[0]?db.npcs[0].id:'';
-  const ds=db.dialogs.filter(d=>d.npc===ui.flowNpc), byId=id=>db.dialogs.find(d=>d.id===id);
-  const linkedTo=new Set(db.dialogs.flatMap(d=>d.lines.flatMap(l=>l.choices.map(c=>c.next))));
-  const entries=ds.filter(d=>!linkedTo.has(d.id));
-  const shown=new Set();
-  const card=(d,seen)=>{ shown.add(d.id); const first=d.lines[0]?d.lines[0].text.replace(/\\[CNVcnv]\[[^\]]*\]|\\[{}.|!><^]/g,'').slice(0,40):'';
-    return h('div',{},h('div',{class:'fc',onclick:()=>openDlg(d.id)},h('div',{class:'row'},h('span',{class:'st '+d.status,title:STATUS[d.status]}),h('span',{},d.id),d.title?h('span',{class:'muted'},d.title):null,h('span',{class:'muted'},d.lines.length+'줄')),
-        first?h('div',{},'"'+first+(d.lines[0].text.length>40?'…':'')+'"'):null),
-      d.lines.flatMap(l=>l.choices).map(ch=>{ const nx=ch.next&&byId(ch.next);
-        return h('div',{class:'fch'},h('div',{class:'muted'},'▸ '+(ch.text||'(빈 선택지)')), !ch.next?h('div',{class:'muted'},'　(대화 끝)'):!nx?h('div',{class:'tag pk'},'없는 대화: '+ch.next):seen.includes(nx.id)?h('div',{class:'muted'},'　↩ '+nx.id+' (위에 이미 나옴)'):card(nx,[...seen,nx.id])); })); };
-  const tl=entries.map(d=>card(d,[d.id]));
-  const orphans=ds.filter(d=>!shown.has(d.id));
-  return h('div',{},h('div',{class:'row',style:'margin-bottom:8px'},h('h2',{},'스토리 흐름'),sel(db.npcs.map(n=>[n.id,n.name||n.id]),ui.flowNpc,v=>ui.flowNpc=v),h('span',{class:'muted'},'선택지로 이어지는 대화는 아래에 달려요. 카드를 누르면 편집으로 가요.')),
-    tl.length?h('div',{class:'flow'},tl):h('div',{class:'panel muted'},'이 손님의 대화가 아직 없어요.'),
-    orphans.length?h('div',{style:'margin-top:14px'},h('h3',{},'분기가 서로 돌기만 하는 대화'),orphans.map(d=>h('div',{class:'fc',onclick:()=>openDlg(d.id)},h('span',{class:'st '+d.status}),' ',d.id,d.title?' · '+d.title:''))):null);
-}
 
 /* ---------- 내보내기 ---------- */
 function unityExport(){
-  const date=k=>{const [m,d]=k.split('-');return {month:+m,day:+d};}, num=v=>v===''||v==null?-1:+v;
-  const fx=a=>a.map(f=>({type:f.type,targetId:f.target||'',intValue:f.type==='flag'?(f.value===false?0:1):(+f.value||0)}));
-  return {customers:db.npcs.map(n=>({id:n.id,codeName:n.code||'',name:n.name,category:n.kind||'normal',portraits:facesOf(n.id),extra:((db.ncols||{})[n.kind||'normal']||[]).map(c=>({name:c.name,value:String((n.x||{})[c.key]??'')}))})),tables:db.tables.map(t=>({name:t.name,kind:t.kind||'',columns:t.cols,rows:t.rows.map(r=>({cells:r.map(c=>String(c??''))}))})),
-    dialogues:db.dialogs.map(d=>({id:d.id,customerId:d.npc,status:d.status,
-      lines:d.lines.map(l=>({key:lineKey(d,l),speakerId:l.speaker,portrait:l.face||'',text:l.text,memo:l.memo||'',effects:fx(l.effects),
-        choices:l.choices.map((c,i)=>({key:lineKey(d,l)+'_C'+(i+1),text:c.text,nextDialogueId:c.next||'',effects:fx(c.effects)}))}))})),
+  const date=k=>{const [m,d]=String(k).split('-');return {month:+m,day:+d};};
+  return {npcs:db.npcs.map(n=>({id:n.id,unityId:n.num||'',name:n.name,category:n.kind||'normal',portraits:facesOf(n.id),extra:((db.ncols||{})[n.kind||'normal']||[]).map(c=>({name:c.name,value:String((n.x||{})[c.key]??'')}))})),
+    tables:db.tables.map(t=>({name:t.name,kind:t.kind||'',columns:t.cols,rows:t.rows.map(r=>({cells:r.map(c=>String(c??''))}))})),
+    visitors:sortedVisits().map(v=>({dateId:dcode(v.d),npcId:v.npc,order:+v.order||0})),
+    dialogues:sortedLines().map(l=>({dateId:dcode(l.d),npcId:l.npc,order:+l.order||0,speakerId:l.speaker,portrait:l.speaker==='player'?'':(l.face||''),text:l.text||''})),
     npcSpawns:Object.keys(db.coord.daily).flatMap(k=>Object.keys(db.coord.daily[k]).flatMap(sid=>Object.keys(db.coord.daily[k][sid]).map(c=>{const o=db.coord.daily[k][sid][c],p=kxy(c);return Object.assign(date(k),{slot:sid,npcId:o.npc||'',name:cname(o),x:p.x,y:p.y});}))),
     fixedNpcs:Object.keys(db.coord.fixed).map(c=>{const f=db.coord.fixed[c],p=kxy(c);return {npcId:f.npc||'',name:cname(f),x:p.x,y:p.y,slots:f.slots||SLOTS.map(x=>x[0]),exceptDates:(f.except||[]).map(date)};})};
 }
-function csvExport(){ const q=s=>'"'+String(s??'').replace(/"/g,'""')+'"', rows=[['key','type','dialogue','speaker','portrait','status','text','memo']];
-  for(const d of db.dialogs)for(const l of d.lines){ rows.push([lineKey(d,l),'line',d.id,l.speaker,l.face,STATUS[d.status],l.text,l.memo]); l.choices.forEach((c,i)=>rows.push([lineKey(d,l)+'_C'+(i+1),'choice',d.id,'','',STATUS[d.status],c.text,''])); }
-  return rows.map(r=>r.map(q).join(',')).join('\r\n'); }
-function csvParse(t,dm=','){ const rows=[]; let row=[],cur='',q=false; t=t.replace(/^\ufeff/,'');
+function csvParse(t,dm=','){ const rows=[]; let row=[],cur='',q=false; t=t.replace(/^﻿/,'');
   for(let i=0;i<t.length;i++){ const c=t[i];
     if(q){ if(c==='"'){ if(t[i+1]==='"'){cur+='"';i++;} else q=false; } else cur+=c; }
     else if(c==='"')q=true; else if(c===dm){row.push(cur);cur='';} else if(c==='\n'||c==='\r'){ if(c==='\r'&&t[i+1]==='\n')i++; row.push(cur);rows.push(row);row=[];cur=''; } else cur+=c; }
   if(cur!==''||row.length){row.push(cur);rows.push(row);} return rows; }
-function csvImport(){ pickFile('.csv,text/csv','text',txt=>{ const rows=csvParse(txt); if(!rows.length){toast('빈 파일이에요');return;} const hd=rows[0].map(s=>s.trim()), ki=hd.indexOf('key'), ti=hd.indexOf('text'), mi=hd.indexOf('memo');
-  if(ki<0||ti<0){toast('key, text 열이 있어야 해요');return;} const map={};
-  for(const d of db.dialogs)for(const l of d.lines){ map[lineKey(d,l)]={o:l,line:true}; l.choices.forEach((c,i)=>map[lineKey(d,l)+'_C'+(i+1)]={o:c}); }
-  snap(); let n=0,miss=0; for(const r of rows.slice(1)){ if(!r[ki])continue; const m=map[r[ki]]; if(!m){miss++;continue;} if(m.o.text!==r[ti]||(m.line&&mi>=0&&m.o.memo!==r[mi]))n++; m.o.text=r[ti]??''; if(m.line&&mi>=0)m.o.memo=r[mi]??''; }
-  touch(); render(); toast(n+'개 바뀜'+(miss?' · 키를 못 찾은 줄 '+miss+'개':''),true); }); }
 
 /* ---------- 내보내기 묶음 ---------- */
 function zipStore(files){ // 무압축 ZIP (UTF-8 파일명)
@@ -932,19 +877,19 @@ function zipStore(files){ // 무압축 ZIP (UTF-8 파일명)
   return new Blob([...parts,...cen,new Uint8Array(e.buffer)],{type:'application/zip'});
 }
 const NFILE={normal:'DataNpcCustomer',special:'DataNpcCustomerSpecial',band:'DataNpcBandMember',talk:'DataNpc'};
-const XFILE={spawn:'NpcSpawnByDate',fixed:'NpcSpawnFixed',dialogue:'Dialogue'};
+const XFILE={spawn:'NpcSpawnByDate',fixed:'NpcSpawnFixed',visits:'DateVisitor',lines:'Dialogue'};
 const fclean=n=>String(n||'').replace(/\.csv$/i,'').replace(/[\\/:*?"<>|]+/g,'_').trim();
-function npcCSV(kind){ const xc=db.ncols[kind]||[]; return toCSV([['ID','CodeName','Name',...xc.map(c=>c.name),'Portraits'],...db.npcs.filter(n=>(n.kind||'normal')===kind).map(n=>[n.id,n.code||'',n.name,...xc.map(c=>(n.x||{})[c.key]??''),facesOf(n.id).join('|')])]); }
-function spawnCSV(){ const S=db.coord, R=[['월','일','요일','DateID','시간대','NpcID','CodeName','Name','X','Y']], code=o=>o.npc&&npcOf(o.npc)?(npcOf(o.npc).code||''):'';
-  for(const k of Object.keys(S.daily).sort((a,b)=>ALLDATES.indexOf(a)-ALLDATES.indexOf(b)))for(const [sid,sn] of SLOTS)for(const c in (S.daily[k][sid]||{})){ const o=S.daily[k][sid][c],p=kxy(c),[m,d]=k.split('-'); R.push([m,d,dowOf(k)>=0?DOW[dowOf(k)]:'',(DM[k]||{}).id||'',sn,o.npc||'',code(o),cname(o),p.x,p.y]); }
+function npcCSV(kind){ const xc=db.ncols[kind]||[]; return toCSV([['ID','CodeName','Name',...xc.map(c=>c.name),'Portraits'],...db.npcs.filter(n=>(n.kind||'normal')===kind).map(n=>[n.num||'',n.id,n.name,...xc.map(c=>(n.x||{})[c.key]??''),facesOf(n.id).join('|')])]); }
+function spawnCSV(){ const S=db.coord, R=[['월','일','요일','DateID','시간대','NpcID','CodeName','Name','X','Y']], code=o=>o.npc&&npcOf(o.npc)?(npcOf(o.npc).num||''):'';
+  for(const k of Object.keys(S.daily).sort((a,b)=>ALLDATES.indexOf(a)-ALLDATES.indexOf(b)))for(const [sid,sn] of SLOTS)for(const c in (S.daily[k][sid]||{})){ const o=S.daily[k][sid][c],p=kxy(c),[m,d]=k.split('-'); R.push([m,d,dowOf(k)>=0?DOW[dowOf(k)]:'',(DM[k]||{}).id||'',sn,code(o),o.npc||'',cname(o),p.x,p.y]); }
   return toCSV(R); }
-function fixedCSV(){ const S=db.coord; return toCSV([['NpcID','CodeName','Name','X','Y','등장 시각','제외 날짜'],...Object.keys(S.fixed).map(c=>{const f=S.fixed[c],p=kxy(c);return [f.npc||'',f.npc&&npcOf(f.npc)?(npcOf(f.npc).code||''):'',cname(f),p.x,p.y,fixSlotTxt(f),fmtEx(f.except)];})]); }
+function fixedCSV(){ const S=db.coord; return toCSV([['NpcID','CodeName','Name','X','Y','등장 시각','제외 날짜'],...Object.keys(S.fixed).map(c=>{const f=S.fixed[c],p=kxy(c);return [f.npc&&npcOf(f.npc)?(npcOf(f.npc).num||''):'',f.npc||'',cname(f),p.x,p.y,fixSlotTxt(f),fmtEx(f.except)];})]); }
 function exportFiles(){ // 표시 이름(label)과 내보내기 파일 이름(file)을 따로 관리
   db.nfile=db.nfile||{}; db.xfile=db.xfile||{};
-  const it=(label,obj,key,def,text)=>({label,def,text,raw:()=>obj[key]??'',set:v=>{obj[key]=v;},get file(){return fclean(obj[key])||def;}});
+  const it=(label,obj,key,def,text)=>({key,label,def,text,raw:()=>obj[key]??'',set:v=>{obj[key]=v;},get file(){return fclean(obj[key])||def;}});
   return {db:[...NKL().map(([k,l])=>it(l,db.nfile,k,NFILE[k],npcCSV(k))),...db.tables.filter(t=>t.kind!=='date').map(t=>it(t.name||'이름 없는 표',t,'file',fclean(t.name)||'table',toCSV([t.cols,...t.rows])))],
-    date:[...db.tables.filter(t=>t.kind==='date').map(t=>it(t.name||'날짜',t,'file','DateDataTable',toCSV([t.cols,...t.rows]))),it('날짜별 NPC 배치',db.xfile,'spawn',XFILE.spawn,spawnCSV()),it('고정 NPC',db.xfile,'fixed',XFILE.fixed,fixedCSV())],
-    dlg:[it('대사',db.xfile,'dialogue',XFILE.dialogue,csvExport())]};
+    date:[...db.tables.filter(t=>t.kind==='date').map(t=>it(t.name||'날짜',t,'file','DateDataTable',toCSV([t.cols,...t.rows]))),it('날짜별 방문자',db.xfile,'visits',XFILE.visits,visitsCSV()),it('날짜별 NPC 배치',db.xfile,'spawn',XFILE.spawn,spawnCSV()),it('고정 NPC',db.xfile,'fixed',XFILE.fixed,fixedCSV())],
+    dlg:[it('대사',db.xfile,'lines',XFILE.lines,linesCSV())]};
 }
 function zipOf(groups){ const enc=new TextEncoder(), used={};
   return zipStore(groups.flatMap(([dir,fs])=>fs.map(f=>{ let base=f.name?f.name.replace(/\.[^.]+$/,''):f.file, ext=f.name?f.name.slice(base.length):'.csv', n=(dir?dir+'/':'')+base, r=n, i=2; while(used[r+ext])r=n+'_'+(i++); used[r+ext]=1;
@@ -957,9 +902,9 @@ function exportModal(){
   modal('내보내기',h('div',{},
       h('p',{class:'muted'},'왼쪽은 표시 이름, 입력칸은 내보낼 파일 이름이에요. 비워 두면 회색으로 보이는 기본 이름을 씁니다.'),
       sec('데이터베이스 — 손님 4분류 + 내가 만든 표',F.db,'database'),
-      sec('날짜 데이터 — 날짜 표 + 좌표 툴의 날짜별 NPC 배치',F.date,'date'),
+      sec('날짜 데이터 — 날짜 표 + 날짜별 방문자 + 좌표 툴의 NPC 배치',F.date,'date'),
       sec('대사',F.dlg,'dialogue'),
-      h('div',{class:'sec'},h('h4',{},'기타'),h('div',{class:'row'},h('button',{class:'sm',onclick:()=>saveFile(nm+'_unity.json',JSON.stringify(unityExport(),null,2))},'Unity JSON 받기'),h('button',{class:'sm',onclick:()=>{closeModal();csvImport();}},'대사 CSV 가져오기')))),
+      h('div',{class:'sec'},h('h4',{},'기타'),h('div',{class:'row'},h('button',{class:'sm',onclick:()=>saveFile(nm+'_unity.json',JSON.stringify(unityExport(),null,2))},'Unity JSON 받기')))),
     h('button',{class:'pri',onclick:()=>saveFile(nm+'_all.zip',zipOf([['database',F.db],['date',F.date],['dialogue',F.dlg],['',[{name:'unity.json',text:JSON.stringify(unityExport(),null,2)},{name:'save.json',text:JSON.stringify(db)}]]]))},'전체 ZIP으로 내보내기'));
 }
 
@@ -967,7 +912,7 @@ function exportModal(){
 $('#modal').addEventListener('click',e=>{ if(e.target.id==='modal')closeModal(); });
 addEventListener('scroll',hideTip,true);
 try{ const f=JSON.parse(localStorage.getItem(LSF)||'null'); if(f&&f.url)loadFont(f.url,false,f.name); }catch(e){}
-try{document.fonts.load('20px Galmuri9').then(()=>{ if(db&&ui.tool==='dialog'&&ui.tab==='edit')pvLoad(true); });}catch(e){}
+try{document.fonts.load('20px Galmuri9').then(()=>{ if(db&&ui.tool==='dialog')pvLoad(true); });}catch(e){}
 showTitle();
 </script>
 </body>
