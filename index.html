@@ -84,6 +84,7 @@ main{flex:1;min-width:0;display:flex;flex-direction:column}
 .li:hover{background:#f6f7f9} .li.on{border-color:var(--sky);background:var(--skyl)}
 .li small{display:block;color:#8a90a0;font-size:11px;font-weight:400}
 .line{border:1px solid var(--line);border-radius:12px;padding:10px;margin-top:8px;background:var(--paper)}
+.line.ev{background:#fffdf3}
 .line.on{border-color:var(--sky);box-shadow:0 0 0 1px var(--sky)}
 .line .hd{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px}
 .sub2{border-left:3px solid var(--sky);padding:2px 0 2px 10px;margin-top:8px;display:flex;flex-direction:column;gap:5px}
@@ -223,12 +224,13 @@ function blankDB(sample){
     d.tables=[d.tables[0],{name:'음료 (예시)',file:'ProductDataTable',kind:'',cols:['ID','CodeName','Name','판매가격','재료1 ID','재료2 ID','재료3 ID','재료4 ID','음료감정1','음료감정2','음료제한시간'],rows:[['1','moss_latte','이끼 라떼','1200','1','2','','','포근함','','30']]},
       {name:'아이템 (예시)',file:'IngredientDataTable',kind:'',cols:['ID','CodeName','Name','맥스스택','몇번사용가능','물류업자에게 구매하는 가격'],rows:[['1','unknown_seed','이름 모를 씨앗','99','1','300']]}];
     d.visits=[{d:'6-1',npc:'Customer1',order:1},{d:'6-1',npc:'Customer2',order:2},{d:'6-1',npc:'Luna',order:3},{d:'6-5',npc:'Luna',order:1}];
-    d.lines=[{d:'6-1',npc:'Customer1',order:1,speaker:'Customer',face:'기본',text:'어서 와, \\C[2]멜로\\C[0].\\| 여기 처음이지?'},
+    d.lines=[{d:'6-1',npc:'Customer1',order:1,type:'Walk',arg:'3,2',speaker:'Customer',face:'',text:''},{d:'6-1',npc:'Customer1',order:4,type:'Cutscene',arg:'FirstOrder',speaker:'Customer',face:'',text:''},{d:'6-1',npc:'Customer1',order:1.5,speaker:'Customer',face:'기본',text:'어서 와, \\C[2]멜로\\C[0].\\| 여기 처음이지?'},
       {d:'6-1',npc:'Customer1',order:2,speaker:'player',face:'',text:'응, 오늘 문 열었어.'},
       {d:'6-1',npc:'Customer1',order:3,speaker:'Customer',face:'웃음',text:'그럼 \\{이끼 라떼\\} 한 잔 부탁해도 될까?'},
       {d:'6-1',npc:'Customer2',order:1,speaker:'Customer',face:'기본',text:'여기 분위기 좋네요.'},
       {d:'6-1',npc:'Luna',order:1,speaker:'Luna',face:'졸림',text:'여기 조용해서 좋다….\\! 한숨 자도 돼?'},
       {d:'6-5',npc:'Luna',order:1,speaker:'Luna',face:'기본',text:'저번에 얘기 들었어.\n오늘은 안 졸려.'}];
+    { const g={}; d.lines.forEach(l=>(g[l.d+'|'+l.npc]=g[l.d+'|'+l.npc]||[]).push(l)); Object.values(g).forEach(arr=>arr.sort((x,y)=>x.order-y.order).forEach((l,i)=>l.order=i+1)); }
   }
   return d;
 }
@@ -634,6 +636,27 @@ const curLines=()=>ui.date&&ui.vnpc?linesOf(ui.date,ui.vnpc):null;
 const curDlg=()=>{const L=curLines();return L?{lines:L}:null;};
 const kindTag=n=>({special:'특별손님',band:'밴드멤버',talk:'대사만'}[n.kind]||'손님');
 const talkers=()=>db.npcs.filter(n=>n.kind==='band'||n.kind==='special'); // 방문자로 고를 수 있는 개별 NPC
+const EVDEF=[{id:'Walk',name:'걷기',param:'tile'},{id:'Cutscene',name:'컷씬',param:'text'},{id:'Wait',name:'기다리기(초)',param:'number'}];
+const evTypes=()=>db.evtypes||(db.evtypes=JSON.parse(JSON.stringify(EVDEF)));
+const isEv=l=>!!l&&!!l.type&&l.type!=='Talk'; // 종류가 비어 있거나 Talk면 대사, 그 밖은 연출
+const evOf=l=>evTypes().find(e=>e.id===l.type)||{id:l.type,name:'⚠ '+l.type,param:'text'};
+const evText=l=>evOf(l).name+(l.arg!==''&&l.arg!=null?' → '+l.arg:'');
+function pickTile(cb){ // 좌표 툴의 맵에서 칸을 눌러 x,y를 고른다
+  const S=C(); let html='';
+  for(let r=0;r<S.grid.length;r++)for(let c=0;c<S.grid[0].length;c++)html+=S.grid[r][c]?`<button class="c off" data-c="${c}" data-r="${r}"></button>`:`<div class="c blk"></div>`;
+  const g=h('div',{id:'cgrid',style:`--cols:${S.grid[0].length};--cell:${Math.min(S.cell,26)}px;--cell-op:1`}); g.innerHTML=html;
+  g.addEventListener('click',e=>{const t=e.target.closest('button.c'); if(!t)return; const q=cxy(+t.dataset.c,+t.dataset.r); cb(q.x+','+q.y); closeModal(); touch(); render();});
+  modal('도착할 칸 고르기',h('div',{},h('p',{class:'muted'},'좌표 설정 툴의 맵과 좌표 기준을 그대로 써요. 파란 칸을 누르면 x,y가 들어갑니다.'),h('div',{style:'overflow:auto;max-height:60vh'},g)));
+}
+function evModal(){
+  const T=evTypes(), body=h('div',{});
+  const draw=()=>put(body,h('table',{},h('tr',{},['ID (영문, CSV에 나감)','표시 이름','값 종류',''].map(x=>h('th',{},x))),
+      T.map((e,i)=>{ const ps=h('select',{},[['tile','맵 좌표 (x,y)'],['text','글자 (예: 컷씬 ID)'],['number','숫자'],['none','값 없음']].map(([v,l])=>h('option',{value:v},l))); ps.value=e.param; ps.addEventListener('change',()=>{e.param=ps.value;touch();});
+        return h('tr',{},h('td',{},inp(e,'id',{style:'width:100%'})),h('td',{},inp(e,'name',{style:'width:100%'})),h('td',{},ps),h('td',{},h('button',{class:'sm ghost',onclick:()=>{T.splice(i,1);touch();draw();}},'✕'))); })),
+    h('div',{style:'margin-top:8px'},h('button',{class:'sm pri',onclick:()=>{T.push({id:'NewEvent',name:'새 연출',param:'text'});touch();draw();}},'+ 종류 추가')),
+    h('p',{class:'muted'},'ID는 대사 CSV의 "종류" 칸에 그대로 나가요. 이미 쓴 연출의 ID를 바꾸거나 지우면 그 줄은 ⚠로 표시됩니다.'));
+  draw(); modal('연출 종류',body,h('button',{class:'pri',onclick:()=>{closeModal();render();}},'닫기'));
+}
 const npcLabel=id=>id==='player'?'플레이어':id===GEN?'손님 ('+GEN+')':isGen(id)?'손님 '+genNo(id)+' ('+id+')':(npcOf(id)?(npcOf(id).name||id)+' ('+id+')':'⚠ '+id);
 function showTip(el){ const t=$('#tip'); t.innerHTML='<div style="margin-bottom:4px">제어 문자</div>'+
   [['\\N[손님ID]','손님 이름으로 대체'],['\\C[n]','이후 글자 색 ('+TEXTCOLNAME.map((n,i)=>i+' '+n).join(', ')+')'],['\\{','글자 크기 한 단계 키움'],['\\}','글자 크기 한 단계 줄임'],['\\\\','문자 \\ 로 대체'],['\\.','1/4초 기다림'],['\\|','1초 기다림'],['\\!','버튼 입력을 기다림'],['\\>','같은 줄 남은 글자를 한꺼번에 표시'],['\\<','한꺼번에 표시 취소'],['\\^','표시 후 입력을 기다리지 않음']]
@@ -672,6 +695,16 @@ function editCol(){
   const spOpts=[[me,npcLabel(me)],['player','플레이어 (player)'],...(me===GEN?[]:[[GEN,npcLabel(GEN)]]),...others.map(n=>[n.id,npcLabel(n.id)])];
   const select=i=>{ if(ui.line!==i){ui.line=i;document.querySelectorAll('.line').forEach((e,j)=>e.classList.toggle('on',j===i));pvLoad(true);} };
   const cards=L.map((l,i)=>{
+    if(isEv(l)){ const ev=evOf(l), mvE=dir=>{const j=i+dir;if(j<0||j>=L.length)return;[L[i],L[j]]=[L[j],L[i]];renum(L);ui.line=j;touch();render();};
+      const arg=ev.param==='none'?null:inp(l,'arg',{type:ev.param==='number'?'number':'text',ph:ev.param==='tile'?'x,y':ev.param==='number'?'숫자':'값 (예: 컷씬 ID)',style:'width:170px',oninput:()=>{ui.line=i;pvLoad(true);}});
+      return h('div',{class:'line ev'+(ui.line===i?' on':''),onclick:e=>{ if(!e.target.closest('button,select'))select(i); }},
+        h('div',{class:'hd',style:'margin-bottom:0'},h('span',{class:'tag',title:'순서'},i+1),h('span',{class:'tag',style:'background:#ffe89a;color:#6b5200'},'연출'),
+          sel(evTypes().map(e=>[e.id,e.name]),l.type,v=>{l.type=v;ui.line=i;}),
+          h('span',{class:'muted'},'대상'),sel(spOpts,l.speaker,v=>{l.speaker=v;ui.line=i;}),
+          arg,ev.param==='tile'?h('button',{class:'sm',onclick:()=>{ui.line=i;pickTile(v=>{l.arg=v;});}},'맵에서 고르기'):null,
+          h('span',{class:'grow'}),
+          h('button',{class:'sm',onclick:()=>mvE(-1)},'↑'),h('button',{class:'sm',onclick:()=>mvE(1)},'↓'),
+          h('button',{class:'sm',onclick:()=>{snap();db.lines.splice(db.lines.indexOf(l),1);renum(linesOf(ui.date,who));ui.line=Math.max(0,i-1);touch();render();toast('연출을 삭제했어요',true);}},'✕'))); }
     const warn=h('div',{});
     const check=()=>{ const lay=layout(parseText(l.text).toks,db.preview); put(warn,lay.lines>db.preview.rows?h('div',{class:'errbox'},'글자 넘침: '+lay.lines+'줄 (말풍선 '+db.preview.rows+'줄)'):null,String(l.text||'').trim()?null:h('div',{class:'warnbox'},'빈 대사예요')); };
     const ta=inp(l,'text',{area:true,ph:'대사를 입력하세요. 마우스를 잠깐 올려 두면 제어 문자 설명이 떠요.',oninput:()=>{ui.line=i;pvLoad(true);check();}});
@@ -689,9 +722,9 @@ function editCol(){
       ta,warn);
   });
   return h('div',{'data-sc':'edit'},
-    h('div',{class:'panel'},h('div',{class:'row'},h('h3',{},npcLabel(who)),h('span',{class:'muted grow'},dlw(ui.date)+' · 대사 '+L.length+'줄 · 위에서부터 순서대로 재생돼요'))),
+    h('div',{class:'panel'},h('div',{class:'row'},h('h3',{},npcLabel(who)),h('span',{class:'muted grow'},dlw(ui.date)+' · 대사 '+L.length+'줄 · 대사와 연출이 위에서부터 순서대로 재생돼요'))),
     cards,
-    h('div',{style:'margin:10px 0 30px'},h('button',{class:'pri',onclick:()=>{const last=L[L.length-1],sp=last?last.speaker:me;db.lines.push({d:ui.date,npc:who,order:L.length+1,speaker:sp,face:last&&last.speaker===sp?last.face:(facesOf(sp)[0]||''),text:''});ui.line=L.length;touch();render();}},'+ 줄 추가')));
+    h('div',{style:'margin:10px 0 30px'},h('button',{class:'pri',onclick:()=>{const last=L[L.length-1],sp=last?last.speaker:me;db.lines.push({d:ui.date,npc:who,order:L.length+1,speaker:sp,face:last&&last.speaker===sp?last.face:(facesOf(sp)[0]||''),text:''});ui.line=L.length;touch();render();}},'+ 줄 추가'),' ',h('button',{onclick:()=>{db.lines.push({d:ui.date,npc:who,order:L.length+1,type:(evTypes()[0]||{id:'Walk'}).id,arg:'',speaker:me,face:'',text:''});ui.line=L.length;touch();render();}},'+ 연출 추가'),' ',h('button',{class:'ghost',onclick:evModal},'연출 종류 관리')));
 }
 
 /* ---------- 방문자 · 대사 표 (데이터베이스 탭) ---------- */
@@ -699,11 +732,11 @@ const sortedVisits=()=>[...db.visits].sort((a,b)=>dord(a.d)-dord(b.d)||byOrder(a
 const sortedLines=()=>{ const vo={}; db.visits.forEach(v=>vo[v.d+'|'+v.npc]=+v.order||0); return [...db.lines].sort((a,b)=>dord(a.d)-dord(b.d)||((vo[a.d+'|'+a.npc]||999)-(vo[b.d+'|'+b.npc]||999))||(a.npc<b.npc?-1:a.npc>b.npc?1:0)||byOrder(a,b)); };
 const NL=s=>String(s??'').replace(/\r?\n/g,'\\n'); // CSV 한 줄 = 대사 한 줄이 되도록 줄바꿈은 \n 글자로 내보낸다
 const visitsCSV=()=>toCSV([['날짜ID','NPC ID','방문 순서'],...sortedVisits().map(v=>[dcode(v.d),v.npc,v.order])]);
-const linesCSV=()=>toCSV([['날짜ID','NPC ID','순서','화자 ID','표정','대사 텍스트'],...sortedLines().map(l=>[dcode(l.d),l.npc,l.order,l.speaker,l.speaker==='player'?'':(l.face||''),NL(l.text)])]);
+const linesCSV=()=>toCSV([['날짜ID','NPC ID','순서','화자 ID','표정','대사 텍스트','종류','연출 값'],...sortedLines().map(l=>[dcode(l.d),l.npc,l.order,l.speaker,isEv(l)||l.speaker==='player'?'':(l.face||''),isEv(l)?'':NL(l.text),isEv(l)?l.type:'Talk',isEv(l)?(l.arg??''):''])]);
 function importTalkCSV(which){
   pickFile('.csv,text/csv','csv',text=>{ const rows=csvParse(text).filter(r=>r.some(c=>String(c).trim()!=='')).slice(1); let bad=0; const out=[];
     for(const r of rows){ const d=dkeyOf(r[0]); if(!d||!String(r[1]||'').trim()){bad++;continue;}
-      out.push(which==='visits'?{d,npc:String(r[1]).trim(),order:+r[2]||out.length+1}:{d,npc:String(r[1]).trim(),order:+r[2]||out.length+1,speaker:String(r[3]||r[1]).trim(),face:String(r[4]||'').trim(),text:String(r[5]??'').replace(/\\n/g,'\n')}); }
+      out.push(which==='visits'?{d,npc:String(r[1]).trim(),order:+r[2]||out.length+1}:{d,npc:String(r[1]).trim(),order:+r[2]||out.length+1,speaker:String(r[3]||r[1]).trim(),face:String(r[4]||'').trim(),text:String(r[5]??'').replace(/\\n/g,'\n'),type:String(r[6]||'').trim()==='Talk'?'':String(r[6]||'').trim(),arg:String(r[7]??'').trim()}); }
     snap(); db[which]=out; touch(); render(); toast(out.length+'행을 불러왔어요'+(bad?' · 날짜ID를 못 찾아 건너뛴 줄 '+bad+'개':''),true); });
 }
 function talkTable(which){
@@ -712,7 +745,8 @@ function talkTable(which){
   const del=r=>h('button',{class:'sm ghost',title:'행 삭제',onclick:()=>{snap();db[which].splice(db[which].indexOf(r),1);touch();render();toast('행을 삭제했어요',true);}},'✕');
   const num=r=>{const e=h('input',{type:'number',value:r.order,style:'min-width:60px'});e.addEventListener('input',()=>{r.order=e.value===''?'':+e.value;touch();});e.addEventListener('change',render);return e;};
   const txt=r=>{const e=h('input',{type:'text',value:r.text,style:'min-width:360px'});e.addEventListener('input',()=>{r.text=e.value;touch();});return e;};
-  const head=isV?['날짜ID','NPC ID','방문 순서']:['날짜ID','NPC ID','순서','화자 ID','표정','대사 텍스트'];
+  const head=isV?['날짜ID','NPC ID','방문 순서']:['날짜ID','NPC ID','순서','화자 ID','표정','대사 텍스트','종류','연출 값'];
+  const argIn=r=>{const e=h('input',{type:'text',value:r.arg??'',style:'min-width:110px'});e.addEventListener('input',()=>{r.arg=e.value;touch();});return e;};
   return h('div',{class:'panel'},
     h('div',{class:'row',style:'margin-bottom:8px'},h('h3',{},isV?'날짜별 방문자':'대사'),
       h('span',{class:'muted grow'},ui.date?dcode(ui.date)+'만 보는 중 ('+rows.length+' / 전체 '+all+'행) · 달력에서 날짜를 해제하면 전체가 보여요':'전체 '+all+'행 · 달력에서 날짜를 고르면 그날만 보여요'),
@@ -720,7 +754,7 @@ function talkTable(which){
       h('button',{class:'sm',onclick:()=>saveFile(exportFiles()[isV?'date':'dlg'].find(f=>f.key===which).file+'.csv','﻿'+(isV?visitsCSV():linesCSV()))},'CSV 내보내기')),
     h('div',{class:'gridwrap','data-sc':'tbl'},h('table',{class:'grid'},h('tr',{},head.map(x=>h('th',{style:'padding:4px 8px'},x)),h('th',{},'')),
       rows.map(r=>h('tr',{},h('td',{},sel(dateOpts,r.d,v=>r.d=v)),h('td',{},sel(npcIds,r.npc,v=>r.npc=v)),h('td',{},num(r)),
-        isV?null:[h('td',{},sel(spIds,r.speaker,v=>{r.speaker=v;if(!facesOf(v).includes(r.face))r.face=facesOf(v)[0]||'';})),h('td',{},r.speaker==='player'?'':sel(facesOf(r.speaker),r.face,v=>r.face=v)),h('td',{},txt(r))],
+        isV?null:[h('td',{},sel(spIds,r.speaker,v=>{r.speaker=v;if(!facesOf(v).includes(r.face))r.face=facesOf(v)[0]||'';})),h('td',{},r.speaker==='player'?'':sel(facesOf(r.speaker),r.face,v=>r.face=v)),h('td',{},txt(r)),h('td',{},sel([['','Talk'],...evTypes().map(e=>[e.id,e.id])],isEv(r)?r.type:'',v=>r.type=v)),h('td',{},isEv(r)?argIn(r):'')],
         h('td',{},del(r)))))),
     h('div',{class:'row',style:'margin-top:8px'},h('button',{class:'pri sm',onclick:()=>{ const d=ui.date||ALLDATES[0], npc=npcIds[0]||''; if(!npc){toast('NPC를 먼저 추가해 주세요');return;}
         if(isV)db.visits.push({d,npc,order:visitsOf(d).length+1}); else db.lines.push({d,npc,order:linesOf(d,npc).length+1,speaker:isGen(npc)?GEN:npc,face:facesOf(npc)[0]||'',text:''}); touch();render(); }},'+ 행 추가'),
@@ -770,7 +804,7 @@ function layout(toks,P){
 const pv={timer:null,shown:0,toks:[],lay:null,waiting:false,done:true,fast:false,noWait:false};
 function pvLoad(instant){
   clearTimeout(pv.timer); const d=curDlg(), l=d&&d.lines[ui.line]; if(!$('#pvc'))return;
-  const p=parseText(l?l.text:''); pv.toks=p.toks; pv.lay=layout(p.toks,db.preview); pv.unknown=p.unknown;
+  const p=parseText(l?(isEv(l)?'\\C[7]〔연출〕 '+evText(l).replace(/\\/g,'\\\\'):l.text):''); pv.toks=p.toks; pv.lay=layout(p.toks,db.preview); pv.unknown=p.unknown;
   pv.noWait=p.toks.some(t=>t.t==='noWait'); pv.waiting=false; pv.fast=false; pv.done=!!instant; pv.shown=instant?p.toks.length:0;
   pvInfo(); pvChoices(); if(instant)pvDraw(); else pvStep();
 }
@@ -863,7 +897,7 @@ function unityExport(){
   return {npcs:db.npcs.map(n=>({id:n.id,unityId:n.num||'',name:n.name,category:n.kind||'normal',portraits:facesOf(n.id),extra:((db.ncols||{})[n.kind||'normal']||[]).map(c=>({name:c.name,value:String((n.x||{})[c.key]??'')}))})),
     tables:db.tables.map(t=>({name:t.name,kind:t.kind||'',columns:t.cols,rows:t.rows.map(r=>({cells:r.map(c=>String(c??''))}))})),
     visitors:sortedVisits().map(v=>({dateId:dcode(v.d),npcId:v.npc,order:+v.order||0})),
-    dialogues:sortedLines().map(l=>({dateId:dcode(l.d),npcId:l.npc,order:+l.order||0,speakerId:l.speaker,portrait:l.speaker==='player'?'':(l.face||''),text:l.text||''})),
+    dialogues:sortedLines().map(l=>({dateId:dcode(l.d),npcId:l.npc,order:+l.order||0,type:isEv(l)?l.type:'Talk',arg:isEv(l)?String(l.arg??''):'',speakerId:l.speaker,portrait:l.speaker==='player'?'':(l.face||''),text:isEv(l)?'':(l.text||'')})),
     npcSpawns:Object.keys(db.coord.daily).flatMap(k=>Object.keys(db.coord.daily[k]).flatMap(sid=>Object.keys(db.coord.daily[k][sid]).map(c=>{const o=db.coord.daily[k][sid][c],p=kxy(c);return Object.assign(date(k),{slot:sid,npcId:o.npc||'',name:cname(o),x:p.x,y:p.y});}))),
     fixedNpcs:Object.keys(db.coord.fixed).map(c=>{const f=db.coord.fixed[c],p=kxy(c);return {npcId:f.npc||'',name:cname(f),x:p.x,y:p.y,slots:f.slots||SLOTS.map(x=>x[0]),exceptDates:(f.except||[]).map(date)};})};
 }
