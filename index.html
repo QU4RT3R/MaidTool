@@ -209,14 +209,14 @@ let db=null, undoSnap=null, saveT=null;
 const ui={tool:'dialog',tab:'edit',dlg:null,line:0,date:null,dateOnly:true,q:'',fNpc:'',fStatus:'',fFlag:'',dbTab:'normal',pvOpen:false,flowNpc:'',coordNpc:''};
 
 function blankDB(sample){
-  const d={app:'merongtool',version:1,name:'새 프로젝트',npcs:[],ncols:{normal:[],special:[],band:[],talk:[]},nseq:1,tables:[],dialogs:[],coord:freshCoord(),
+  const d={app:'merongtool',version:1,name:'새 프로젝트',npcs:[],ncols:{normal:[],special:[],band:[],talk:[]},nseq:1,nlabel:{},nfile:{},xfile:{},tables:[],dialogs:[],coord:freshCoord(),
     preview:{v:2,w:480,rows:3,font:20,lineH:28,pad:14,scale:1,speed:40,pixel:true,bubbleImg:'',standImg:'',stands:{},standBack:false,sx:'',sy:'',tx:'',ty:'',tw:'',showName:true,nx:'',ny:''}};
   if(sample){
     d.name='예시 프로젝트';
     d.npcs=[{id:'npc_moss',name:'모스',color:'#8fc9a3',faces:'기본, 웃음, 당황'},{id:'npc_luna',name:'루나',color:'#8fd0ee',faces:'기본, 졸림',kind:'special'},{id:'band_rio',name:'리오',color:'#f9c0dc',faces:'기본',kind:'band',x:{c0:'기타'}}];
     d.ncols.band=[{key:'c0',name:'담당 악기',type:'enum',options:['보컬','기타','베이스','드럼','키보드']}];
-    d.tables=[{name:'음료 (예시)',kind:'recipe',cols:['ID','CodeName','Name','판매가격','재료1 ID','재료2 ID','재료3 ID','재료4 ID','음료감정1','음료감정2','음료제한시간'],rows:[['1','moss_latte','이끼 라떼','1200','1','2','','','포근함','','30']]},
-      {name:'아이템 (예시)',kind:'item',cols:['ID','CodeName','Name','맥스스택','몇번사용가능','물류업자에게 구매하는 가격'],rows:[['1','unknown_seed','이름 모를 씨앗','99','1','300']]}];
+    d.tables=[{name:'음료 (예시)',file:'ProductDataTable',kind:'recipe',cols:['ID','CodeName','Name','판매가격','재료1 ID','재료2 ID','재료3 ID','재료4 ID','음료감정1','음료감정2','음료제한시간'],rows:[['1','moss_latte','이끼 라떼','1200','1','2','','','포근함','','30']]},
+      {name:'아이템 (예시)',file:'IngredientDataTable',kind:'item',cols:['ID','CodeName','Name','맥스스택','몇번사용가능','물류업자에게 구매하는 가격'],rows:[['1','unknown_seed','이름 모를 씨앗','99','1','300']]}];
     d.dialogs=[
       {id:'moss_visit1',title:'첫 방문',npc:'npc_moss',status:'review',entry:'cond',seq:3,
        cond:{visit:1,affMin:'',affMax:'',mood:'',dates:[],flags:[]},
@@ -259,8 +259,9 @@ async function saveFile(name,text){
       why=({rejected_extension:'이 파일 형식은 저장이 막혀 있어요',extension_not_enabled:'이 화면에서는 이 파일 형식 저장이 꺼져 있어요',too_large:'파일이 너무 커요',bad_request:'파일 이름이나 내용에 문제가 있어요'}[code]||'이 화면에서는 저장 기능을 쓸 수 없어요')+' ('+code+(e&&e.message?': '+e.message:'')+')'; } }
   else if(!why) why='이 화면에서는 저장 기능이 허용되지 않았어요 (unavailable)';
   if(!window.claude){ // Claude 밖(깃허브 페이지 등)에서는 브라우저 기본 다운로드
-    try{ const u=URL.createObjectURL(new Blob([text],{type:/\.csv$/.test(name)?'text/csv;charset=utf-8':'application/json'})), el=h('a',{href:u,download:name,style:'display:none'});
+    try{ const u=URL.createObjectURL(text instanceof Blob?text:new Blob([text],{type:/\.csv$/.test(name)?'text/csv;charset=utf-8':'application/json'})), el=h('a',{href:u,download:name,style:'display:none'});
       document.body.append(el); el.click(); setTimeout(()=>{el.remove();URL.revokeObjectURL(u);},1500); toast(name+' 저장했어요'); return; }catch(e){ why='브라우저 다운로드가 막혀 있어요 ('+e.message+')'; } }
+  if(text instanceof Blob){ toast('파일 저장 실패 — '+why); return; }
   const ta=h('textarea',{readonly:true,value:text});
   modal(name,h('div',{},h('p',{class:'errbox'},'파일 저장 실패 — '+why),h('p',{class:'muted'},'대신 내용을 그대로 보여드려요. 복사해서 '+name+' 파일로 저장하면 똑같이 불러올 수 있어요.'),ta),
     h('button',{class:'pri',onclick:async()=>{try{await navigator.clipboard.writeText(text);toast('복사했어요');}catch(e){ta.select();toast('Ctrl+C로 복사해 주세요');}}},'전체 복사'));
@@ -311,9 +312,7 @@ function renderTop(){
     inp(db,'name',{ph:'프로젝트 이름',style:'width:180px'}),
     h('span',{class:'muted grow',id:'saved'},''),
     h('button',{class:'pri',onclick:()=>saveFile((db.name||'merongtool')+'.json',JSON.stringify(db,null,1))},'세이브 저장'),
-    h('button',{onclick:()=>saveFile((db.name||'merongtool')+'_unity.json',JSON.stringify(unityExport(),null,2))},'Unity JSON'),
-    h('button',{onclick:()=>saveFile((db.name||'merongtool')+'_text.csv','\ufeff'+csvExport())},'CSV 내보내기'),
-    h('button',{onclick:csvImport},'CSV 가져오기'),
+    h('button',{onclick:exportModal},'내보내기'),
     h('button',{class:'ghost',onclick:()=>{ put($('#top'),); showTitle(); }},'타이틀로'));
 }
 function dateSets(){ const s=new Set(); for(const k in db.coord.daily) if(Object.values(db.coord.daily[k]).some(o=>Object.keys(o).length))s.add(k); return s; }
@@ -329,6 +328,7 @@ function renderCal(){
 
 /* ---------- 데이터베이스 ---------- */
 const NK=[['normal','손님(NPC)'],['special','특별손님'],['band','밴드멤버'],['talk','대사만 있는 손님']];
+const NKL=()=>NK.map(([k,l])=>[k,((db.nlabel||{})[k]||'').trim()||l]);
 const NCOLS=[['id','ID'],['name','이름'],['color','색','color'],['faces','표정 목록 (쉼표로 구분)']];
 function colModal(cur,save,del){
   const name=h('input',{type:'text',value:cur.name||'',style:'width:100%'});
@@ -367,7 +367,7 @@ function tableView(ti){
   const delCol=ci=>{t.cols.splice(ci,1);t.meta.length=Math.max(t.meta.length,ci+1);t.meta.splice(ci,1);t.rows.forEach(r=>r.splice(ci,1));};
   const colIn=ci=>{const e=h('input',{type:'text',value:t.cols[ci],style:'font-weight:700'});e.addEventListener('input',()=>{t.cols[ci]=e.value;touch();});return e;};
   return h('div',{class:'panel'},
-    h('div',{class:'row',style:'margin-bottom:8px'},inp(t,'name',{rerender:true,style:'width:180px',ph:'표 이름'}),
+    h('div',{class:'row',style:'margin-bottom:8px'},h('label',{class:'f'},'표시 이름',inp(t,'name',{rerender:true,style:'width:170px',ph:'표 이름'})),h('label',{class:'f'},'내보내기 파일 이름',h('span',{},inp(t,'file',{style:'width:170px',ph:fclean(t.name)||'table'}),' .csv')),
       h('label',{},'대화 툴에서 쓰는 용도 ',sel([['','없음'],['item','아이템 해금 대상'],['recipe','레시피 해금 대상']],t.kind||'',v=>t.kind=v)),
       h('span',{class:'muted grow'},t.rows.length+'행 × '+t.cols.length+'열'),
       h('button',{class:'sm',onclick:()=>importCSV(ti)},'CSV 다시 불러오기'),
@@ -386,21 +386,23 @@ function dbView(){
   if(!NK.some(k=>k[0]===ui.dbTab)&&!(isT()&&db.tables[+ui.dbTab.slice(1)]))ui.dbTab='normal';
   const kindOf=n=>n.kind||'normal';
   const tab=(k,l,n)=>h('button',{class:ui.dbTab===k?'on':'',onclick:()=>{ui.dbTab=k;render();}},l,h('span',{class:'muted'},' '+n));
-  const tabs=h('div',{class:'row',style:'margin-bottom:10px'},h('div',{class:'tabs',style:'margin-bottom:0'},NK.map(([k,l])=>tab(k,l,db.npcs.filter(n=>kindOf(n)===k).length)),db.tables.map((t,i)=>tab('t'+i,t.name||'이름 없는 표',t.rows.length))),
+  const tabs=h('div',{class:'row',style:'margin-bottom:10px'},h('div',{class:'tabs',style:'margin-bottom:0'},NKL().map(([k,l])=>tab(k,l,db.npcs.filter(n=>kindOf(n)===k).length)),db.tables.map((t,i)=>tab('t'+i,t.name||'이름 없는 표',t.rows.length))),
     h('button',{class:'pri',onclick:()=>importCSV()},'+ CSV 불러오기'));
   if(isT())return h('div',{},tabs,tableView(+ui.dbTab.slice(1)));
   const rows=db.npcs.filter(n=>kindOf(n)===ui.dbTab), ids=db.npcs.map(r=>r.id), dup=new Set(ids.filter((x,i)=>ids.indexOf(x)!==i));
   const xc=db.ncols[ui.dbTab]||(db.ncols[ui.dbTab]=[]);
   const addCol=()=>{const c={key:'c'+(db.nseq++),name:'새 열',type:'text',options:[]};xc.push(c);touch();render();colModal(c,o=>Object.assign(c,o),()=>xc.splice(xc.indexOf(c),1));};
   const pre={normal:'npc',special:'special',band:'band',talk:'talk'}[ui.dbTab];
+  db.nlabel=db.nlabel||{}; db.nfile=db.nfile||{};
   return h('div',{},tabs,
     h('div',{class:'panel'},
+      h('div',{class:'row',style:'margin-bottom:10px'},h('label',{class:'f'},'표시 이름',inp(db.nlabel,ui.dbTab,{rerender:true,style:'width:170px',ph:NK.find(k=>k[0]===ui.dbTab)[1]})),h('label',{class:'f'},'내보내기 파일 이름',h('span',{},inp(db.nfile,ui.dbTab,{style:'width:200px',ph:NFILE[ui.dbTab]}),' .csv'))),
       h('div',{style:'overflow:auto'},h('table',{style:'min-width:'+(700+xc.length*150)+'px'},h('tr',{},NCOLS.map(c=>h('th',{},c[1])),
           xc.map(c=>h('th',{},c.name,c.type==='enum'?h('span',{class:'tag sky',style:'margin-left:4px'},'목록'):null,h('button',{class:'sm ghost',title:'열 설정 (이름 · 값 종류 · 선택 목록 · 삭제)',onclick:()=>colModal(c,o=>Object.assign(c,o),()=>xc.splice(xc.indexOf(c),1))},'⚙'))),
           h('th',{style:'width:150px'},'분류'),h('th',{style:'width:40px'},'')),
         rows.map(r=>h('tr',{},NCOLS.map(c=>h('td',{style:c[0]==='id'&&dup.has(r.id)?'background:var(--pinkl)':''},inp(r,c[0],{type:c[2]||'text',rerender:c[0]==='id'}))),
           xc.map(c=>h('td',{},typedCell(c,()=>(r.x||{})[c.key],v=>{(r.x||(r.x={}))[c.key]=v;}))),
-          h('td',{},sel(NK,kindOf(r),v=>r.kind=v)),
+          h('td',{},sel(NKL(),kindOf(r),v=>r.kind=v)),
           h('td',{},h('button',{class:'sm ghost',title:'삭제',onclick:()=>{snap();db.npcs.splice(db.npcs.indexOf(r),1);touch();render();toast('삭제했어요',true);}},'✕')))))),
       rows.length?null:h('p',{class:'muted'},'아직 없어요.'),
       h('div',{class:'row',style:'margin-top:8px'},h('button',{class:'pri',onclick:()=>{db.npcs.push({id:pre+'_new',name:'',color:'#8fd0ee',faces:'기본',kind:ui.dbTab});touch();render();}},'+ 추가'),h('button',{onclick:addCol},'+ 열 추가'),
@@ -725,7 +727,7 @@ function pvDraw(){
   if(!P.standBack)stand();
   const tcv=document.createElement('canvas'); tcv.width=W; tcv.height=H; const t=tcv.getContext('2d'); t.textBaseline='top';
   if(l){
-    const npc=npcOf(l.speaker), col=l.speaker==='player'?'#f4a6ba':(npc?npc.color:'#c9ced6'), name=speakerName(l.speaker);
+    const npc=npcOf(l.speaker), col=l.speaker==='player'?'#fbd3dc':'#cfe8fb', name=speakerName(l.speaker);
     t.font=P.font+'px '+FONT; t.fillStyle=INK;
     if(G.bi){ if(P.showName)t.fillText(name,G.nx,G.ny); }
     else{ const nw=Math.ceil(t.measureText(name).width)+12; c.fillStyle=INK; c.fillRect(G.bx+6,G.by,nw+4,G.nameH+2); c.fillStyle=col; c.fillRect(G.bx+8,G.by+2,nw,G.nameH-2); t.fillText(name,G.bx+14,G.by+Math.floor((G.nameH+2-P.font)/2)); }
@@ -859,6 +861,51 @@ function csvImport(){ pickFile('.csv,text/csv','text',txt=>{ const rows=csvParse
   for(const d of db.dialogs)for(const l of d.lines){ map[lineKey(d,l)]={o:l,line:true}; l.choices.forEach((c,i)=>map[lineKey(d,l)+'_C'+(i+1)]={o:c}); }
   snap(); let n=0,miss=0; for(const r of rows.slice(1)){ if(!r[ki])continue; const m=map[r[ki]]; if(!m){miss++;continue;} if(m.o.text!==r[ti]||(m.line&&mi>=0&&m.o.memo!==r[mi]))n++; m.o.text=r[ti]??''; if(m.line&&mi>=0)m.o.memo=r[mi]??''; }
   touch(); render(); toast(n+'개 바뀜'+(miss?' · 키를 못 찾은 줄 '+miss+'개':''),true); }); }
+
+/* ---------- 내보내기 묶음 ---------- */
+function zipStore(files){ // 무압축 ZIP (UTF-8 파일명)
+  const enc=new TextEncoder(), T=[]; for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=c&1?0xEDB88320^(c>>>1):c>>>1;T[n]=c>>>0;}
+  const crc=b=>{let c=~0;for(let i=0;i<b.length;i++)c=T[(c^b[i])&255]^(c>>>8);return (~c)>>>0;};
+  const parts=[],cen=[]; let off=0;
+  for(const f of files){ const nm=enc.encode(f.name), d=f.data, c=crc(d);
+    const lh=new DataView(new ArrayBuffer(30)); lh.setUint32(0,0x04034b50,true); lh.setUint16(4,20,true); lh.setUint16(6,0x0800,true); lh.setUint16(12,0x21,true); lh.setUint32(14,c,true); lh.setUint32(18,d.length,true); lh.setUint32(22,d.length,true); lh.setUint16(26,nm.length,true);
+    parts.push(new Uint8Array(lh.buffer),nm,d);
+    const ch=new DataView(new ArrayBuffer(46)); ch.setUint32(0,0x02014b50,true); ch.setUint16(4,20,true); ch.setUint16(6,20,true); ch.setUint16(8,0x0800,true); ch.setUint16(14,0x21,true); ch.setUint32(16,c,true); ch.setUint32(20,d.length,true); ch.setUint32(24,d.length,true); ch.setUint16(28,nm.length,true); ch.setUint32(42,off,true);
+    cen.push(new Uint8Array(ch.buffer),nm); off+=30+nm.length+d.length; }
+  const csz=cen.reduce((a,b)=>a+b.length,0), e=new DataView(new ArrayBuffer(22)); e.setUint32(0,0x06054b50,true); e.setUint16(8,files.length,true); e.setUint16(10,files.length,true); e.setUint32(12,csz,true); e.setUint32(16,off,true);
+  return new Blob([...parts,...cen,new Uint8Array(e.buffer)],{type:'application/zip'});
+}
+const NFILE={normal:'DataNpcCustomer',special:'DataNpcCustomerSpecial',band:'DataNpcBandMember',talk:'DataNpc'};
+const XFILE={spawn:'NpcSpawnByDate',fixed:'NpcSpawnFixed',dialogue:'Dialogue'};
+const fclean=n=>String(n||'').replace(/\.csv$/i,'').replace(/[\\/:*?"<>|]+/g,'_').trim();
+function npcCSV(kind){ const xc=db.ncols[kind]||[]; return toCSV([['ID','Name','Portraits',...xc.map(c=>c.name)],...db.npcs.filter(n=>(n.kind||'normal')===kind).map(n=>[n.id,n.name,facesOf(n.id).join('|'),...xc.map(c=>(n.x||{})[c.key]??'')])]); }
+function spawnCSV(){ const S=db.coord, R=[['월','일','시간대','NpcID','Name','X','Y']];
+  for(const k of Object.keys(S.daily).sort((a,b)=>ALLDATES.indexOf(a)-ALLDATES.indexOf(b)))for(const [sid,sn] of SLOTS)for(const c in (S.daily[k][sid]||{})){ const o=S.daily[k][sid][c],p=kxy(c),[m,d]=k.split('-'); R.push([m,d,sn,o.npc||'',cname(o),p.x,p.y]); }
+  return toCSV(R); }
+function fixedCSV(){ const S=db.coord; return toCSV([['NpcID','Name','X','Y','등장 시각','제외 날짜'],...Object.keys(S.fixed).map(c=>{const f=S.fixed[c],p=kxy(c);return [f.npc||'',cname(f),p.x,p.y,fixSlotTxt(f),fmtEx(f.except)];})]); }
+function exportFiles(){ // 표시 이름(label)과 내보내기 파일 이름(file)을 따로 관리
+  db.nfile=db.nfile||{}; db.xfile=db.xfile||{};
+  const it=(label,obj,key,def,text)=>({label,def,text,raw:()=>obj[key]??'',set:v=>{obj[key]=v;},get file(){return fclean(obj[key])||def;}});
+  return {db:[...NKL().map(([k,l])=>it(l,db.nfile,k,NFILE[k],npcCSV(k))),...db.tables.map(t=>it(t.name||'이름 없는 표',t,'file',fclean(t.name)||'table',toCSV([t.cols,...t.rows])))],
+    date:[it('날짜별 NPC 배치',db.xfile,'spawn',XFILE.spawn,spawnCSV()),it('고정 NPC',db.xfile,'fixed',XFILE.fixed,fixedCSV())],
+    dlg:[it('대사',db.xfile,'dialogue',XFILE.dialogue,csvExport())]};
+}
+function zipOf(groups){ const enc=new TextEncoder(), used={};
+  return zipStore(groups.flatMap(([dir,fs])=>fs.map(f=>{ let base=f.name?f.name.replace(/\.[^.]+$/,''):f.file, ext=f.name?f.name.slice(base.length):'.csv', n=(dir?dir+'/':'')+base, r=n, i=2; while(used[r+ext])r=n+'_'+(i++); used[r+ext]=1;
+    return {name:r+ext,data:enc.encode((ext==='.csv'?'﻿':'')+f.text)}; }))); }
+function exportModal(){
+  const F=exportFiles(), nm=db.name||'merongdi';
+  const row=f=>{ const e=h('input',{type:'text',value:f.raw(),placeholder:f.def,style:'width:210px'}); e.addEventListener('input',()=>{f.set(e.value);touch();});
+    return h('div',{class:'row'},h('span',{class:'grow'},f.label),e,h('span',{class:'muted'},'.csv'),h('span',{class:'muted',style:'min-width:36px;text-align:right'},Math.max(0,f.text.split('\r\n').length-1)+'행'),h('button',{class:'sm',onclick:()=>saveFile(f.file+'.csv','﻿'+f.text)},'받기')); };
+  const sec=(title,fs,dir)=>h('div',{class:'sec'},h('h4',{},title),fs.map(row),fs.length>1?h('div',{},h('button',{class:'sm',onclick:()=>saveFile(nm+'_'+dir+'.zip',zipOf([['',fs]]))},'이 묶음만 ZIP으로')):null);
+  modal('내보내기',h('div',{},
+      h('p',{class:'muted'},'왼쪽은 표시 이름, 입력칸은 내보낼 파일 이름이에요. 비워 두면 회색으로 보이는 기본 이름을 씁니다.'),
+      sec('데이터베이스 — 손님 4분류 + 내가 만든 표',F.db,'database'),
+      sec('날짜 데이터 — 좌표 툴의 날짜별 NPC 배치',F.date,'date'),
+      sec('대사',F.dlg,'dialogue'),
+      h('div',{class:'sec'},h('h4',{},'기타'),h('div',{class:'row'},h('button',{class:'sm',onclick:()=>saveFile(nm+'_unity.json',JSON.stringify(unityExport(),null,2))},'Unity JSON 받기'),h('button',{class:'sm',onclick:()=>{closeModal();csvImport();}},'대사 CSV 가져오기')))),
+    h('button',{class:'pri',onclick:()=>saveFile(nm+'_all.zip',zipOf([['database',F.db],['date',F.date],['dialogue',F.dlg],['',[{name:'unity.json',text:JSON.stringify(unityExport(),null,2)},{name:'save.json',text:JSON.stringify(db)}]]]))},'전체 ZIP으로 내보내기'));
+}
 
 /* ---------- 시작 ---------- */
 $('#modal').addEventListener('click',e=>{ if(e.target.id==='modal')closeModal(); });
