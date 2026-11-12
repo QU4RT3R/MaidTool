@@ -60,6 +60,9 @@ h2,h3{margin:0;font-weight:700} h2{font-size:16px} h3{font-size:13px}
 .days{display:grid;grid-template-columns:repeat(7,1fr);gap:3px}
 .days button{padding:0;height:25px;font-size:11px;font-weight:600;border-radius:6px;position:relative;font-family:ui-monospace,Consolas,monospace}
 .days button.has:after{content:"";position:absolute;right:2px;bottom:2px;width:4px;height:4px;border-radius:50%;background:var(--moss)}
+.days.wk{font-size:10px;color:#8a90a0;text-align:center;margin-bottom:2px}
+.days .sun{color:#cf4d49}.days .sat{color:#3a74cc}
+.days button.closed{background:repeating-linear-gradient(-45deg,#fff 0 4px,#eef0f4 4px 8px);color:#9aa0ad}
 .days button.on{border:2px solid var(--sky);background:var(--skyl)}
 main{flex:1;min-width:0;display:flex;flex-direction:column}
 #top{display:flex;gap:8px;align-items:center;padding:8px 12px;background:var(--paper);border-bottom:1px solid var(--line);flex-wrap:wrap}
@@ -209,13 +212,13 @@ let db=null, undoSnap=null, saveT=null;
 const ui={tool:'dialog',tab:'edit',dlg:null,line:0,date:null,dateOnly:true,q:'',fNpc:'',fStatus:'',fFlag:'',dbTab:'normal',pvOpen:false,flowNpc:'',coordNpc:''};
 
 function blankDB(sample){
-  const d={app:'merongtool',version:1,name:'새 프로젝트',npcs:[],ncols:{normal:[],special:[],band:[],talk:[]},nseq:1,nlabel:{},nfile:{},xfile:{},tables:[],dialogs:[],coord:freshCoord(),
+  const d={app:'merongtool',version:1,name:'새 프로젝트',npcs:[],ncols:{normal:[],special:[],band:[],talk:[]},nseq:1,nlabel:{},nfile:{},xfile:{},tables:[defaultDateTable()],dialogs:[],coord:freshCoord(),
     preview:{v:2,w:480,rows:3,font:20,lineH:28,pad:14,scale:1,speed:40,pixel:true,bubbleImg:'',standImg:'',stands:{},standBack:false,sx:'',sy:'',tx:'',ty:'',tw:'',showName:true,nx:'',ny:''}};
   if(sample){
     d.name='예시 프로젝트';
     d.npcs=[{id:'npc_moss',name:'모스',color:'#8fc9a3',faces:'기본, 웃음, 당황'},{id:'npc_luna',name:'루나',color:'#8fd0ee',faces:'기본, 졸림',kind:'special'},{id:'band_rio',name:'리오',color:'#f9c0dc',faces:'기본',kind:'band',x:{c0:'기타'}}];
     d.ncols.band=[{key:'c0',name:'담당 악기',type:'enum',options:['보컬','기타','베이스','드럼','키보드']}];
-    d.tables=[{name:'음료 (예시)',file:'ProductDataTable',kind:'recipe',cols:['ID','CodeName','Name','판매가격','재료1 ID','재료2 ID','재료3 ID','재료4 ID','음료감정1','음료감정2','음료제한시간'],rows:[['1','moss_latte','이끼 라떼','1200','1','2','','','포근함','','30']]},
+    d.tables=[d.tables[0],{name:'음료 (예시)',file:'ProductDataTable',kind:'recipe',cols:['ID','CodeName','Name','판매가격','재료1 ID','재료2 ID','재료3 ID','재료4 ID','음료감정1','음료감정2','음료제한시간'],rows:[['1','moss_latte','이끼 라떼','1200','1','2','','','포근함','','30']]},
       {name:'아이템 (예시)',file:'IngredientDataTable',kind:'item',cols:['ID','CodeName','Name','맥스스택','몇번사용가능','물류업자에게 구매하는 가격'],rows:[['1','unknown_seed','이름 모를 씨앗','99','1','300']]}];
     d.dialogs=[
       {id:'moss_visit1',title:'첫 방문',npc:'npc_moss',status:'review',entry:'cond',seq:3,
@@ -236,6 +239,9 @@ function normalize(d){ // 오래된 세이브·빠진 필드 보정
   const b=blankDB(false);
   for(const k in b) if(d[k]==null) d[k]=b[k];
   for(const [k,nm,kind] of [['items','아이템','item'],['recipes','레시피','recipe']]){ if(Array.isArray(d[k])&&d[k].length)d.tables.push({name:nm,kind,cols:['ID','Name','설명'],rows:d[k].map(r=>[r.id,r.name||'',r.desc||''])}); delete d[k]; }
+  for(const t of d.tables){ if(!t.kind&&isDateCols(t.cols)&&!d.tables.some(x=>x.kind==='date'))t.kind='date'; }
+  if(!d.tables.some(t=>t.kind==='date'))d.tables.unshift(defaultDateTable());
+  fillOldDow(d.tables.find(x=>x.kind==='date'));
   delete d.vars; delete d.flags; for(const n of d.npcs)n.kind=n.kind||'normal';
   d.preview=d.preview&&d.preview.v===2?Object.assign(b.preview,d.preview):b.preview; delete d.coords; delete d.map; d.coord=Object.assign(b.coord,d.coord);
   for(const g of d.dialogs){ g.cond=Object.assign({visit:'',affMin:'',affMax:'',mood:'',dates:[],flags:[]},g.cond); g.lines=g.lines||[]; g.entry=g.entry||'cond'; g.status=g.status||'draft';
@@ -298,6 +304,7 @@ function go(tool){ ui.tool=tool; try{location.hash=tool;}catch(e){} render(); }
 function render(){
   const keep={}; document.querySelectorAll('[data-sc]').forEach(e=>keep[e.dataset.sc]=[e.scrollTop,e.scrollLeft]);
   if(ui.tool==='coord'&&!ui.date)ui.date=ALLDATES[0];
+  DM=dateMap();
   put($('#nav'),TOOLS.map(([k,l])=>h('button',{class:ui.tool===k?'on':'',onclick:()=>go(k)},l)));
   renderCal(); renderTop();
   const v=$('#view'); v.dataset.sc='view';
@@ -316,14 +323,53 @@ function renderTop(){
     h('button',{class:'ghost',onclick:()=>{ put($('#top'),); showTitle(); }},'타이틀로'));
 }
 function dateSets(){ const s=new Set(); for(const k in db.coord.daily) if(Object.values(db.coord.daily[k]).some(o=>Object.keys(o).length))s.add(k); return s; }
+/* ---------- 날짜 데이터 (kind:'date' 표) ---------- */
+const DOW='일월화수목금토';
+const DATECOLS=['ID','CodeName','Name','월','일','요일','가게영업여부','진행이벤트','오늘의 일반 손님 예정','예정 특별손님ID 1','예정 특별손님ID 2','예정 특별손님ID 3','예정 특별손님ID 4','메모'];
+function defaultDateTable(){ // 팀 캘린더 CSV와 같은 구성. 6월 1일 = 금요일, 4월 5일 = 수, 4월 14일 = 금
+  const MN={4:'April',6:'June',7:'July',8:'August'}, seq=ALLDATES.filter(k=>!SPECIAL.includes(k));
+  const rows=ALLDATES.map(k=>{ const [m,d]=k.split('-').map(Number), old=SPECIAL.includes(k), w=old?(k==='4-5'?'수':'금'):DOW[(5+seq.indexOf(k))%7];
+    return ['21'+String(m).padStart(2,'0')+String(d).padStart(2,'0'),MN[m]+d,m+'월 '+d+'일',String(m),String(d),w,old?'-1':'1','',old?'0':'','','','','',old?'작년':(k==='6-1'?'여기부터 올해':'')]; });
+  const meta=DATECOLS.map(c=>c==='요일'?{type:'enum',options:[...DOW]}:null);
+  return {name:'날짜',file:'DateDataTable',kind:'date',cols:[...DATECOLS],rows,meta};
+}
+function fillOldDow(t){ if(!t)return; const cs=t.cols.map(c=>String(c).replace(/\s/g,'')), cm=cs.indexOf('월'), cd=cs.indexOf('일'), cw=cs.indexOf('요일'); // 작년 두 날짜의 빈 요일 채우기
+  if(cm>=0&&cd>=0&&cw>=0)for(const r of t.rows){ const k=(+r[cm])+'-'+(+r[cd]); if(!String(r[cw]||'').trim()){ if(k==='4-5')r[cw]='수'; if(k==='4-14')r[cw]='금'; } } }
+const isDateCols=cols=>{const c=cols.map(x=>String(x).replace(/\s/g,''));return c.includes('월')&&c.includes('일')&&c.includes('요일');};
+let DM={};
+function dateMap(){
+  const t=db.tables.find(x=>x.kind==='date'), m={}; if(!t)return m;
+  const cs=t.cols.map(c=>String(c).replace(/\s/g,'')), ix=n=>cs.indexOf(n), find=kw=>cs.findIndex(c=>c.includes(kw));
+  const cm=ix('월'),cd=ix('일'),cw=ix('요일'),co=find('가게영업'),ce=find('이벤트'),cg=find('일반손님'),cn=find('메모'),sp=cs.map((c,i)=>c.includes('특별손님')?i:-1).filter(i=>i>=0);
+  if(cm<0||cd<0)return m;
+  const g=(r,i)=>i>=0?String(r[i]??'').trim():'';
+  for(const r of t.rows){ if(!(+r[cm]&&+r[cd]))continue; m[(+r[cm])+'-'+(+r[cd])]={dow:g(r,cw)?DOW.indexOf(g(r,cw).charAt(0)):-1,closed:g(r,co)==='-1'||g(r,co)==='0',event:g(r,ce),guests:g(r,cg),memo:g(r,cn),special:sp.map(i=>g(r,i)).filter(v=>v&&v!=='-1')}; }
+  const seq=ALLDATES.filter(k=>!SPECIAL.includes(k)), base=seq.findIndex(k=>m[k]&&m[k].dow>=0); // 6~8월은 이어진 날짜라 빈 요일을 채워 준다
+  if(base>=0)seq.forEach((k,i)=>{ if(!m[k])m[k]={dow:-1,special:[]}; if(m[k].dow<0)m[k].dow=(((m[seq[base]].dow+i-base)%7)+7)%7; });
+  return m;
+}
+const dowOf=k=>DM[k]&&DM[k].dow>=0?DM[k].dow:-1;
+const dlw=k=>dl(k)+(dowOf(k)>=0?' ('+DOW[dowOf(k)]+')':'');
+function dateChips(k){ const d=DM[k]; if(!d)return h('span',{class:'muted'},'날짜 표에 이 날짜가 없어요');
+  return [h('span',{class:'tag '+(d.closed?'pk':'moss')},d.closed?'휴무':'영업'),
+    d.event?h('span',{class:'tag',style:'background:#ffe89a;color:#6b5200'},'이벤트 '+d.event):null,
+    d.guests!==''&&d.guests!=null?h('span',{class:'tag'},'일반 손님 '+d.guests):null,
+    (d.special||[]).map(id=>h('span',{class:'tag sky'},'특별 '+(npcOf(id)?(npcOf(id).name||id)+' ('+id+')':id))),
+    d.memo?h('span',{class:'muted'},'메모: '+d.memo):null,
+    h('button',{class:'sm ghost',onclick:()=>{const i=db.tables.findIndex(t=>t.kind==='date');if(i>=0){ui.dbTab='t'+i;go('db');}}},'날짜 표 열기')]; }
 function renderCal(){
   const has=dateSets();
-  const day=k=>h('button',{class:(ui.date===k?'on ':'')+(has.has(k)?'has':''),title:dl(k),onclick:()=>{ui.date=ui.date===k?null:k;render();}},k.split('-')[1]);
+  const day=(k,label,st)=>{ const w=dowOf(k), d=DM[k]||{};
+    return h('button',{class:(ui.date===k?'on ':'')+(has.has(k)?'has ':'')+(w===0?'sun ':w===6?'sat ':'')+(d.closed?'closed':''),style:st,
+      title:dlw(k)+(d.closed?' · 휴무':'')+(d.event?' · '+d.event:'')+(d.special&&d.special.length?' · 특별손님 '+d.special.length+'명':'')+(d.memo?' · '+d.memo:''),
+      onclick:()=>{ui.date=ui.date===k?null:k;render();}},label); };
   put($('#cal'),
-    h('div',{class:'row'},h('span',{class:'tag '+(ui.date?'sky':'')},ui.date?dl(ui.date):'날짜 전체'),ui.date?h('button',{class:'sm',onclick:()=>{ui.date=null;render();}},'해제'):null),
-    h('h4',{},'4월'), h('div',{class:'days'},SPECIAL.map(day)),
-    MONTHS.map(([m,n])=>[h('h4',{},m+'월'),h('div',{class:'days'},Array.from({length:n},(_,i)=>day(m+'-'+(i+1))))]),
-    h('p',{class:'muted'},'초록 점: 그 날짜에 NPC 배치가 있어요.'));
+    h('div',{class:'row'},h('span',{class:'tag '+(ui.date?'sky':'')},ui.date?dlw(ui.date):'날짜 전체'),ui.date?h('button',{class:'sm',onclick:()=>{ui.date=null;render();}},'해제'):null),
+    h('h4',{},'4월'), h('div',{class:'days',style:'grid-template-columns:repeat(2,1fr)'},SPECIAL.map(k=>day(k,k.split('-')[1]+(dowOf(k)>=0?' '+DOW[dowOf(k)]:'')))),
+    MONTHS.map(([m,n])=>{ const first=dowOf(m+'-1');
+      return [h('h4',{},m+'월'),first>=0?h('div',{class:'days wk'},[...DOW].map((x,j)=>h('span',{class:j===0?'sun':j===6?'sat':''},x))):null,
+        h('div',{class:'days'},Array.from({length:n},(_,i)=>day(m+'-'+(i+1),i+1,i===0&&first>=0?'grid-column-start:'+(first+1):null)))]; }),
+    h('p',{class:'muted'},'초록 점: NPC 배치 있음 · 빗금: 휴무. 요일과 휴무는 데이터베이스의 날짜 표에서 가져와요.'));
 }
 
 /* ---------- 데이터베이스 ---------- */
@@ -357,7 +403,8 @@ function importCSV(ti){
     const cols=rows[0].map(c=>String(c).trim()), data=rows.slice(1).map(r=>{const a=r.slice(0,cols.length);while(a.length<cols.length)a.push('');return a;});
     snap();
     if(ti!=null){ const t=db.tables[ti], old={}; t.cols.forEach((c,i)=>{ if((t.meta||[])[i])old[c]=t.meta[i]; }); t.cols=cols; t.rows=data; t.meta=cols.map(c=>old[c]||null); }
-    else{ const j=cols.join(' '); db.tables.push({name:file.name.replace(/\.[^.]+$/,''),kind:/재료|판매가격/.test(j)?'recipe':/스택/.test(j)?'item':'',cols,rows:data}); ui.dbTab='t'+(db.tables.length-1); }
+    else{ const j=cols.join(' '); db.tables.push({name:file.name.replace(/\.[^.]+$/,''),kind:isDateCols(cols)&&!db.tables.some(t=>t.kind==='date')?'date':/재료|판매가격/.test(j)?'recipe':/스택/.test(j)?'item':'',cols,rows:data}); ui.dbTab='t'+(db.tables.length-1); }
+    db.tables.forEach(t=>{ if(t.kind==='date')fillOldDow(t); });
     touch(); render(); toast('CSV를 불러왔어요: '+data.length+'행 × '+cols.length+'열',true); });
 }
 function tableView(ti){
@@ -368,7 +415,7 @@ function tableView(ti){
   const colIn=ci=>{const e=h('input',{type:'text',value:t.cols[ci],style:'font-weight:700'});e.addEventListener('input',()=>{t.cols[ci]=e.value;touch();});return e;};
   return h('div',{class:'panel'},
     h('div',{class:'row',style:'margin-bottom:8px'},h('label',{class:'f'},'표시 이름',inp(t,'name',{rerender:true,style:'width:170px',ph:'표 이름'})),h('label',{class:'f'},'내보내기 파일 이름',h('span',{},inp(t,'file',{style:'width:170px',ph:fclean(t.name)||'table'}),' .csv')),
-      h('label',{},'대화 툴에서 쓰는 용도 ',sel([['','없음'],['item','아이템 해금 대상'],['recipe','레시피 해금 대상']],t.kind||'',v=>t.kind=v)),
+      h('label',{},'용도 ',sel([['','없음'],['item','아이템 해금 대상'],['recipe','레시피 해금 대상'],['date','날짜 데이터 (달력 · 좌표 툴에 표시)']],t.kind||'',v=>{ if(v==='date')db.tables.forEach(x=>{if(x.kind==='date')x.kind='';}); t.kind=v; })),
       h('span',{class:'muted grow'},t.rows.length+'행 × '+t.cols.length+'열'),
       h('button',{class:'sm',onclick:()=>importCSV(ti)},'CSV 다시 불러오기'),
       h('button',{class:'sm',onclick:()=>saveFile((t.name||'table')+'.csv','﻿'+toCSV([t.cols,...t.rows]))},'CSV 내보내기'),
@@ -522,7 +569,7 @@ function coordView(){
     touch(); render(); });
   const seg=(items,cur,on)=>h('div',{class:'seg'},items.map(([v,l])=>h('button',{class:cur===v?'on':'',onclick:()=>on(v)},l)));
   const legend=h('div',{class:'legend'}); legend.innerHTML='<span><i style="background:#f6b8b8"></i>스폰 불가</span><span><i style="background:#b5d2f7"></i>비어 있음</span><span><i style="background:#b4e3bd"></i>NPC 배치됨</span><span>꾹 누르기(또는 우클릭) = 고정 NPC</span>';
-  const head=h('div',{class:'row',style:'margin-bottom:10px'},h('h2',{},dl(ui.date)),
+  const head=h('div',{class:'row',style:'margin-bottom:6px'},h('h2',{},dlw(ui.date)),
     seg(SLOTS.map(([id,n])=>[id,n+(hasAny(dd[id])?' ·':'')]),S.slot,v=>{S.slot=v;touch();render();}),
     h('span',{class:'muted'},'클릭 동작'),seg([['place','NPC 배치'],['edit','맵 수정'],['origin','원점 지정']],cmode,v=>{cmode=v;render();}),legend);
   const L=colsN-1,B=rowsN-1,o=S.origin, ov=o.c===0&&o.r===0?'tl':o.c===0&&o.r===B?'bl':o.c===L&&o.r===0?'tr':o.c===L&&o.r===B?'br':'custom';
@@ -555,7 +602,7 @@ function coordView(){
         h('td',{},cname(f),Array.isArray(f.slots)?h('div',{class:'muted'},fixSlotTxt(f)):null,f.except&&f.except.length?h('div',{class:'muted'},'제외 '+fmtEx(f.except)):null),
         h('td',{class:'num'},p.x),h('td',{class:'num'},p.y),h('td',{style:'width:1px'},h('button',{class:'sm ghost',title:'수정',onclick:()=>openFix(k)},'✎')));})):h('span',{class:'muted'},'칸을 꾹 누르면 고정 NPC로 지정돼요.'),
       h('div',{class:'row'},h('button',{class:'sm',onclick:()=>copyText(tsv(fk.map(k=>{const p=kxy(k),f=S.fixed[k];return [clean(cname(f)),p.x,p.y,clean(fixSlotTxt(f)),fmtEx(f.except)];})),'고정 NPC')},'엑셀용 복사'))));
-  return h('div',{class:'dlgwrap'},head,h('div',{class:'coordwrap'},left,mapPane,right));
+  return h('div',{class:'dlgwrap'},head,h('div',{class:'row',style:'margin-bottom:10px'},dateChips(ui.date)),h('div',{class:'coordwrap'},left,mapPane,right));
 }
 
 /* ---------- 대화 툴 ---------- */
@@ -879,15 +926,15 @@ const NFILE={normal:'DataNpcCustomer',special:'DataNpcCustomerSpecial',band:'Dat
 const XFILE={spawn:'NpcSpawnByDate',fixed:'NpcSpawnFixed',dialogue:'Dialogue'};
 const fclean=n=>String(n||'').replace(/\.csv$/i,'').replace(/[\\/:*?"<>|]+/g,'_').trim();
 function npcCSV(kind){ const xc=db.ncols[kind]||[]; return toCSV([['ID','Name','Portraits',...xc.map(c=>c.name)],...db.npcs.filter(n=>(n.kind||'normal')===kind).map(n=>[n.id,n.name,facesOf(n.id).join('|'),...xc.map(c=>(n.x||{})[c.key]??'')])]); }
-function spawnCSV(){ const S=db.coord, R=[['월','일','시간대','NpcID','Name','X','Y']];
-  for(const k of Object.keys(S.daily).sort((a,b)=>ALLDATES.indexOf(a)-ALLDATES.indexOf(b)))for(const [sid,sn] of SLOTS)for(const c in (S.daily[k][sid]||{})){ const o=S.daily[k][sid][c],p=kxy(c),[m,d]=k.split('-'); R.push([m,d,sn,o.npc||'',cname(o),p.x,p.y]); }
+function spawnCSV(){ const S=db.coord, R=[['월','일','요일','시간대','NpcID','Name','X','Y']];
+  for(const k of Object.keys(S.daily).sort((a,b)=>ALLDATES.indexOf(a)-ALLDATES.indexOf(b)))for(const [sid,sn] of SLOTS)for(const c in (S.daily[k][sid]||{})){ const o=S.daily[k][sid][c],p=kxy(c),[m,d]=k.split('-'); R.push([m,d,dowOf(k)>=0?DOW[dowOf(k)]:'',sn,o.npc||'',cname(o),p.x,p.y]); }
   return toCSV(R); }
 function fixedCSV(){ const S=db.coord; return toCSV([['NpcID','Name','X','Y','등장 시각','제외 날짜'],...Object.keys(S.fixed).map(c=>{const f=S.fixed[c],p=kxy(c);return [f.npc||'',cname(f),p.x,p.y,fixSlotTxt(f),fmtEx(f.except)];})]); }
 function exportFiles(){ // 표시 이름(label)과 내보내기 파일 이름(file)을 따로 관리
   db.nfile=db.nfile||{}; db.xfile=db.xfile||{};
   const it=(label,obj,key,def,text)=>({label,def,text,raw:()=>obj[key]??'',set:v=>{obj[key]=v;},get file(){return fclean(obj[key])||def;}});
-  return {db:[...NKL().map(([k,l])=>it(l,db.nfile,k,NFILE[k],npcCSV(k))),...db.tables.map(t=>it(t.name||'이름 없는 표',t,'file',fclean(t.name)||'table',toCSV([t.cols,...t.rows])))],
-    date:[it('날짜별 NPC 배치',db.xfile,'spawn',XFILE.spawn,spawnCSV()),it('고정 NPC',db.xfile,'fixed',XFILE.fixed,fixedCSV())],
+  return {db:[...NKL().map(([k,l])=>it(l,db.nfile,k,NFILE[k],npcCSV(k))),...db.tables.filter(t=>t.kind!=='date').map(t=>it(t.name||'이름 없는 표',t,'file',fclean(t.name)||'table',toCSV([t.cols,...t.rows])))],
+    date:[...db.tables.filter(t=>t.kind==='date').map(t=>it(t.name||'날짜',t,'file','DateDataTable',toCSV([t.cols,...t.rows]))),it('날짜별 NPC 배치',db.xfile,'spawn',XFILE.spawn,spawnCSV()),it('고정 NPC',db.xfile,'fixed',XFILE.fixed,fixedCSV())],
     dlg:[it('대사',db.xfile,'dialogue',XFILE.dialogue,csvExport())]};
 }
 function zipOf(groups){ const enc=new TextEncoder(), used={};
@@ -901,7 +948,7 @@ function exportModal(){
   modal('내보내기',h('div',{},
       h('p',{class:'muted'},'왼쪽은 표시 이름, 입력칸은 내보낼 파일 이름이에요. 비워 두면 회색으로 보이는 기본 이름을 씁니다.'),
       sec('데이터베이스 — 손님 4분류 + 내가 만든 표',F.db,'database'),
-      sec('날짜 데이터 — 좌표 툴의 날짜별 NPC 배치',F.date,'date'),
+      sec('날짜 데이터 — 날짜 표 + 좌표 툴의 날짜별 NPC 배치',F.date,'date'),
       sec('대사',F.dlg,'dialogue'),
       h('div',{class:'sec'},h('h4',{},'기타'),h('div',{class:'row'},h('button',{class:'sm',onclick:()=>saveFile(nm+'_unity.json',JSON.stringify(unityExport(),null,2))},'Unity JSON 받기'),h('button',{class:'sm',onclick:()=>{closeModal();csvImport();}},'대사 CSV 가져오기')))),
     h('button',{class:'pri',onclick:()=>saveFile(nm+'_all.zip',zipOf([['database',F.db],['date',F.date],['dialogue',F.dlg],['',[{name:'unity.json',text:JSON.stringify(unityExport(),null,2)},{name:'save.json',text:JSON.stringify(db)}]]]))},'전체 ZIP으로 내보내기'));
