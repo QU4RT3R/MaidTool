@@ -212,26 +212,28 @@ let db=null, undoSnap=null, saveT=null;
 const ui={tool:'dialog',tab:'edit',dlg:null,line:0,date:null,dateOnly:true,q:'',fNpc:'',fStatus:'',fFlag:'',dbTab:'normal',pvOpen:false,flowNpc:'',coordNpc:''};
 
 function blankDB(sample){
-  const d={app:'merongtool',version:1,name:'새 프로젝트',npcs:[],ncols:{normal:[],special:[],band:[],talk:[]},nseq:1,nlabel:{},nfile:{},xfile:{},tables:[defaultDateTable()],dialogs:[],coord:freshCoord(),
+  const d={app:'merongtool',version:1,name:'새 프로젝트',npcs:[],ncols:{},nseq:1,nlabel:{},nfile:{},xfile:{},tables:[defaultDateTable()],dialogs:[],coord:freshCoord(),
     preview:{v:2,w:480,rows:3,font:20,lineH:28,pad:14,scale:1,speed:40,pixel:true,bubbleImg:'',standImg:'',stands:{},standBack:false,sx:'',sy:'',tx:'',ty:'',tw:'',showName:true,nx:'',ny:''}};
+  ensureNpcCols(d);
   if(sample){
     d.name='예시 프로젝트';
-    d.npcs=[{id:'npc_moss',name:'모스',color:'#8fc9a3',faces:'기본, 웃음, 당황'},{id:'npc_luna',name:'루나',color:'#8fd0ee',faces:'기본, 졸림',kind:'special'},{id:'band_rio',name:'리오',color:'#f9c0dc',faces:'기본',kind:'band',x:{c0:'기타'}}];
+    d.npcs=[{id:'1001',code:'Moss',name:'모스',color:'#8fc9a3',faces:'기본, 웃음, 당황'},{id:'2001',code:'Luna',name:'루나',color:'#8fd0ee',faces:'기본, 졸림',kind:'special'},{id:'3001',code:'Rio',name:'리오',color:'#f9c0dc',faces:'기본',kind:'band',x:{c0:'기타'}}];
     d.ncols.band=[{key:'c0',name:'담당 악기',type:'enum',options:['보컬','기타','베이스','드럼','키보드']}];
+    ensureNpcCols(d);
     d.tables=[d.tables[0],{name:'음료 (예시)',file:'ProductDataTable',kind:'recipe',cols:['ID','CodeName','Name','판매가격','재료1 ID','재료2 ID','재료3 ID','재료4 ID','음료감정1','음료감정2','음료제한시간'],rows:[['1','moss_latte','이끼 라떼','1200','1','2','','','포근함','','30']]},
       {name:'아이템 (예시)',file:'IngredientDataTable',kind:'item',cols:['ID','CodeName','Name','맥스스택','몇번사용가능','물류업자에게 구매하는 가격'],rows:[['1','unknown_seed','이름 모를 씨앗','99','1','300']]}];
     d.dialogs=[
-      {id:'moss_visit1',title:'첫 방문',npc:'npc_moss',status:'review',entry:'cond',seq:3,
+      {id:'moss_visit1',title:'첫 방문',npc:'1001',status:'review',entry:'cond',seq:3,
        cond:{visit:1,affMin:'',affMax:'',mood:'',dates:[],flags:[]},
-       lines:[{n:1,speaker:'npc_moss',face:'기본',text:'어서 와, \\C[2]멜로\\C[0].\\| 여기 처음이지?',memo:'',effects:[],choices:[]},
-              {n:2,speaker:'npc_moss',face:'웃음',text:'오늘은 \\{이끼 라떼\\} 한 잔 부탁해도 될까?',memo:'여기서 주문 UI 연출',effects:[],
-               choices:[{text:'금방 만들어 줄게!',next:'moss_visit1_yes',effects:[{type:'affinity',target:'npc_moss',value:2}]},{text:'그게 뭔데…?',next:'moss_visit1_what',effects:[]}]}]},
-      {id:'moss_visit1_yes',title:'첫 방문 - 수락',npc:'npc_moss',status:'draft',entry:'link',seq:2,cond:{visit:'',affMin:'',affMax:'',mood:'',dates:[],flags:[]},
-       lines:[{n:1,speaker:'npc_moss',face:'웃음',text:'고마워.\\. 이건 답례야.',memo:'',effects:[{type:'item',target:'1',value:1}],choices:[]}]},
-      {id:'moss_visit1_what',title:'첫 방문 - 되묻기',npc:'npc_moss',status:'draft',entry:'link',seq:2,cond:{visit:'',affMin:'',affMax:'',mood:'',dates:[],flags:[]},
-       lines:[{n:1,speaker:'npc_moss',face:'당황',text:'어…\\. 그러니까, 초록색이고 폭신폭신한 거.\n레시피 적어 줄게.',memo:'',effects:[{type:'recipe',target:'1',value:1}],choices:[]}]},
-      {id:'luna_0605',title:'6월 5일 특별 방문',npc:'npc_luna',status:'draft',entry:'cond',seq:2,cond:{visit:'',affMin:'',affMax:'',mood:'',dates:['6-5'],flags:['met_moss']},
-       lines:[{n:1,speaker:'npc_luna',face:'졸림',text:'모스한테 얘기 들었어….\\! 여기 조용해서 좋다.',memo:'',effects:[],choices:[]}]}];
+       lines:[{n:1,speaker:'1001',face:'기본',text:'어서 와, \\C[2]멜로\\C[0].\\| 여기 처음이지?',memo:'',effects:[],choices:[]},
+              {n:2,speaker:'1001',face:'웃음',text:'오늘은 \\{이끼 라떼\\} 한 잔 부탁해도 될까?',memo:'여기서 주문 UI 연출',effects:[],
+               choices:[{text:'금방 만들어 줄게!',next:'moss_visit1_yes',effects:[{type:'affinity',target:'1001',value:2}]},{text:'그게 뭔데…?',next:'moss_visit1_what',effects:[]}]}]},
+      {id:'moss_visit1_yes',title:'첫 방문 - 수락',npc:'1001',status:'draft',entry:'link',seq:2,cond:{visit:'',affMin:'',affMax:'',mood:'',dates:[],flags:[]},
+       lines:[{n:1,speaker:'1001',face:'웃음',text:'고마워.\\. 이건 답례야.',memo:'',effects:[{type:'item',target:'1',value:1}],choices:[]}]},
+      {id:'moss_visit1_what',title:'첫 방문 - 되묻기',npc:'1001',status:'draft',entry:'link',seq:2,cond:{visit:'',affMin:'',affMax:'',mood:'',dates:[],flags:[]},
+       lines:[{n:1,speaker:'1001',face:'당황',text:'어…\\. 그러니까, 초록색이고 폭신폭신한 거.\n레시피 적어 줄게.',memo:'',effects:[{type:'recipe',target:'1',value:1}],choices:[]}]},
+      {id:'luna_0605',title:'6월 5일 특별 방문',npc:'2001',status:'draft',entry:'cond',seq:2,cond:{visit:'',affMin:'',affMax:'',mood:'',dates:['6-5'],flags:['met_moss']},
+       lines:[{n:1,speaker:'2001',face:'졸림',text:'모스한테 얘기 들었어….\\! 여기 조용해서 좋다.',memo:'',effects:[],choices:[]}]}];
   }
   return d;
 }
@@ -242,6 +244,7 @@ function normalize(d){ // 오래된 세이브·빠진 필드 보정
   for(const t of d.tables){ if(!t.kind&&isDateCols(t.cols)&&!d.tables.some(x=>x.kind==='date'))t.kind='date'; }
   if(!d.tables.some(t=>t.kind==='date'))d.tables.unshift(defaultDateTable());
   fillOldDow(d.tables.find(x=>x.kind==='date'));
+  ensureNpcCols(d);
   delete d.vars; delete d.flags; for(const n of d.npcs)n.kind=n.kind||'normal';
   d.preview=d.preview&&d.preview.v===2?Object.assign(b.preview,d.preview):b.preview; delete d.coords; delete d.map; d.coord=Object.assign(b.coord,d.coord);
   for(const g of d.dialogs){ g.cond=Object.assign({visit:'',affMin:'',affMax:'',mood:'',dates:[],flags:[]},g.cond); g.lines=g.lines||[]; g.entry=g.entry||'cond'; g.status=g.status||'draft';
@@ -340,10 +343,10 @@ let DM={};
 function dateMap(){
   const t=db.tables.find(x=>x.kind==='date'), m={}; if(!t)return m;
   const cs=t.cols.map(c=>String(c).replace(/\s/g,'')), ix=n=>cs.indexOf(n), find=kw=>cs.findIndex(c=>c.includes(kw));
-  const cm=ix('월'),cd=ix('일'),cw=ix('요일'),co=find('가게영업'),ce=find('이벤트'),cg=find('일반손님'),cn=find('메모'),sp=cs.map((c,i)=>c.includes('특별손님')?i:-1).filter(i=>i>=0);
+  const ci=cs.findIndex(c=>c.toLowerCase()==='id'),cm=ix('월'),cd=ix('일'),cw=ix('요일'),co=find('가게영업'),ce=find('이벤트'),cg=find('일반손님'),cn=find('메모'),sp=cs.map((c,i)=>c.includes('특별손님')?i:-1).filter(i=>i>=0);
   if(cm<0||cd<0)return m;
   const g=(r,i)=>i>=0?String(r[i]??'').trim():'';
-  for(const r of t.rows){ if(!(+r[cm]&&+r[cd]))continue; m[(+r[cm])+'-'+(+r[cd])]={dow:g(r,cw)?DOW.indexOf(g(r,cw).charAt(0)):-1,closed:g(r,co)==='-1'||g(r,co)==='0',event:g(r,ce),guests:g(r,cg),memo:g(r,cn),special:sp.map(i=>g(r,i)).filter(v=>v&&v!=='-1')}; }
+  for(const r of t.rows){ if(!(+r[cm]&&+r[cd]))continue; m[(+r[cm])+'-'+(+r[cd])]={id:g(r,ci),dow:g(r,cw)?DOW.indexOf(g(r,cw).charAt(0)):-1,closed:g(r,co)==='-1'||g(r,co)==='0',event:g(r,ce),guests:g(r,cg),memo:g(r,cn),special:sp.map(i=>g(r,i)).filter(v=>v&&v!=='-1')}; }
   const seq=ALLDATES.filter(k=>!SPECIAL.includes(k)), base=seq.findIndex(k=>m[k]&&m[k].dow>=0); // 6~8월은 이어진 날짜라 빈 요일을 채워 준다
   if(base>=0)seq.forEach((k,i)=>{ if(!m[k])m[k]={dow:-1,special:[]}; if(m[k].dow<0)m[k].dow=(((m[seq[base]].dow+i-base)%7)+7)%7; });
   return m;
@@ -375,7 +378,13 @@ function renderCal(){
 /* ---------- 데이터베이스 ---------- */
 const NK=[['normal','손님(NPC)'],['special','특별손님'],['band','밴드멤버'],['talk','대사만 있는 손님']];
 const NKL=()=>NK.map(([k,l])=>[k,((db.nlabel||{})[k]||'').trim()||l]);
-const NCOLS=[['id','ID'],['name','이름'],['color','색','color'],['faces','표정 목록 (쉼표로 구분)']];
+const NCOLS=[['id','ID (숫자)'],['code','CodeName'],['name','이름'],['faces','표정 목록 (쉼표로 구분)']];
+// 유니티 임포터가 열 순서로 읽기 때문에, 아래 기본 열은 항상 맨 앞에 이 순서로 둔다
+const NVAL=['Value_Happy_Min','Value_Happy_Max','Value_Anger_Min','Value_Anger_Max','Value_Love_Min','Value_Love_Max','Value_Sad_Min','Value_Sad_Max'];
+const NDEF={normal:['TalkStartID',...NVAL],special:['TalkStartID',...NVAL],band:['TalkStartID'],talk:['TalkStartID']};
+function ensureNpcCols(d){ d.ncols=d.ncols||{};
+  for(const k in NDEF){ const cur=d.ncols[k]||[]; const def=NDEF[k].map(n=>cur.find(c=>c.name===n)||{key:n,name:n,type:'number',options:[]}); def.forEach(c=>c.fixed=true);
+    d.ncols[k]=[...def,...cur.filter(c=>!NDEF[k].includes(c.name))]; } }
 function colModal(cur,save,del){
   const name=h('input',{type:'text',value:cur.name||'',style:'width:100%'});
   const type=h('select',{},[['text','텍스트'],['number','숫자'],['enum','선택 목록 (enum)']].map(([v,l])=>h('option',{value:v},l))); type.value=cur.type||'text';
@@ -391,7 +400,7 @@ function typedCell(m,get,set){
   if(m.type==='enum')return sel([['','—'],...(m.options||[])],String(get()??''),set);
   const e=h('input',{type:m.type==='number'?'number':'text',value:get()??''}); e.addEventListener('input',()=>{set(e.value);touch();}); return e;
 }
-const toCSV=rows=>rows.map(r=>r.map(s=>'"'+String(s??'').replace(/"/g,'""')+'"').join(',')).join('\r\n');
+const toCSV=rows=>rows.map(r=>r.map(s=>{s=String(s??'');return /[",\r\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}).join(',')).join('\r\n');
 function tableRows(kind){ const out=[];
   for(const t of db.tables){ if(t.kind!==kind)continue; const lc=t.cols.map(c=>String(c).trim().toLowerCase()); let ii=lc.indexOf('id'); if(ii<0)ii=0; let ni=lc.indexOf('name'); if(ni<0)ni=lc.indexOf('codename');
     for(const r of t.rows){ const id=String(r[ii]??'').trim(); if(id)out.push({id,name:ni>=0&&r[ni]?String(r[ni]):id}); } }
@@ -444,17 +453,17 @@ function dbView(){
   return h('div',{},tabs,
     h('div',{class:'panel'},
       h('div',{class:'row',style:'margin-bottom:10px'},h('label',{class:'f'},'표시 이름',inp(db.nlabel,ui.dbTab,{rerender:true,style:'width:170px',ph:NK.find(k=>k[0]===ui.dbTab)[1]})),h('label',{class:'f'},'내보내기 파일 이름',h('span',{},inp(db.nfile,ui.dbTab,{style:'width:200px',ph:NFILE[ui.dbTab]}),' .csv'))),
-      h('div',{style:'overflow:auto'},h('table',{style:'min-width:'+(700+xc.length*150)+'px'},h('tr',{},NCOLS.map(c=>h('th',{},c[1])),
-          xc.map(c=>h('th',{},c.name,c.type==='enum'?h('span',{class:'tag sky',style:'margin-left:4px'},'목록'):null,h('button',{class:'sm ghost',title:'열 설정 (이름 · 값 종류 · 선택 목록 · 삭제)',onclick:()=>colModal(c,o=>Object.assign(c,o),()=>xc.splice(xc.indexOf(c),1))},'⚙'))),
+      h('div',{style:'overflow:auto'},h('table',{style:'min-width:'+(820+xc.length*130)+'px'},h('tr',{},NCOLS.map(c=>h('th',{},c[1])),
+          xc.map(c=>h('th',{},c.name,c.type==='enum'?h('span',{class:'tag sky',style:'margin-left:4px'},'목록'):null,c.fixed?null:h('button',{class:'sm ghost',title:'열 설정 (이름 · 값 종류 · 선택 목록 · 삭제)',onclick:()=>colModal(c,o=>Object.assign(c,o),()=>xc.splice(xc.indexOf(c),1))},'⚙'))),
           h('th',{style:'width:150px'},'분류'),h('th',{style:'width:40px'},'')),
         rows.map(r=>h('tr',{},NCOLS.map(c=>h('td',{style:c[0]==='id'&&dup.has(r.id)?'background:var(--pinkl)':''},inp(r,c[0],{type:c[2]||'text',rerender:c[0]==='id'}))),
           xc.map(c=>h('td',{},typedCell(c,()=>(r.x||{})[c.key],v=>{(r.x||(r.x={}))[c.key]=v;}))),
           h('td',{},sel(NKL(),kindOf(r),v=>r.kind=v)),
           h('td',{},h('button',{class:'sm ghost',title:'삭제',onclick:()=>{snap();db.npcs.splice(db.npcs.indexOf(r),1);touch();render();toast('삭제했어요',true);}},'✕')))))),
       rows.length?null:h('p',{class:'muted'},'아직 없어요.'),
-      h('div',{class:'row',style:'margin-top:8px'},h('button',{class:'pri',onclick:()=>{db.npcs.push({id:pre+'_new',name:'',color:'#8fd0ee',faces:'기본',kind:ui.dbTab});touch();render();}},'+ 추가'),h('button',{onclick:addCol},'+ 열 추가'),
+      h('div',{class:'row',style:'margin-top:8px'},h('button',{class:'pri',onclick:()=>{const nid=String(Math.max(0,...db.npcs.map(n=>/^\d+$/.test(n.id)?+n.id:0))+1); db.npcs.push({id:nid,code:'',name:'',faces:'기본',kind:ui.dbTab});touch();render();}},'+ 추가'),h('button',{onclick:addCol},'+ 열 추가'),
         dup.size?h('span',{class:'tag pk'},'겹치는 ID가 있어요 (분류가 달라도 ID는 하나씩)'):null,
-        h('span',{class:'muted'},'열은 분류마다 따로예요. ⚙에서 값 종류를 선택 목록으로 바꾸면 드롭다운이 됩니다. 네 분류 모두 대화 툴의 손님·화자 드롭다운에 나와요.'))));
+        h('span',{class:'muted'},'ID는 숫자로 써 주세요(유니티 ID가 int). 영어 이름의 기본 열은 유니티 임포터가 순서대로 읽어서 고정이고, 그 뒤로 열을 자유롭게 추가할 수 있어요.'))));
 }
 
 /* ---------- 좌표 설정 툴 (NPC 좌표 설정기 이식, 캘린더 부분 제외) ---------- */
@@ -888,7 +897,7 @@ function flowView(){
 function unityExport(){
   const date=k=>{const [m,d]=k.split('-');return {month:+m,day:+d};}, num=v=>v===''||v==null?-1:+v;
   const fx=a=>a.map(f=>({type:f.type,targetId:f.target||'',intValue:f.type==='flag'?(f.value===false?0:1):(+f.value||0)}));
-  return {customers:db.npcs.map(n=>({id:n.id,name:n.name,category:n.kind||'normal',portraits:facesOf(n.id),extra:((db.ncols||{})[n.kind||'normal']||[]).map(c=>({name:c.name,value:String((n.x||{})[c.key]??'')}))})),tables:db.tables.map(t=>({name:t.name,kind:t.kind||'',columns:t.cols,rows:t.rows.map(r=>({cells:r.map(c=>String(c??''))}))})),
+  return {customers:db.npcs.map(n=>({id:n.id,codeName:n.code||'',name:n.name,category:n.kind||'normal',portraits:facesOf(n.id),extra:((db.ncols||{})[n.kind||'normal']||[]).map(c=>({name:c.name,value:String((n.x||{})[c.key]??'')}))})),tables:db.tables.map(t=>({name:t.name,kind:t.kind||'',columns:t.cols,rows:t.rows.map(r=>({cells:r.map(c=>String(c??''))}))})),
     dialogues:db.dialogs.map(d=>({id:d.id,customerId:d.npc,status:d.status,
       lines:d.lines.map(l=>({key:lineKey(d,l),speakerId:l.speaker,portrait:l.face||'',text:l.text,memo:l.memo||'',effects:fx(l.effects),
         choices:l.choices.map((c,i)=>({key:lineKey(d,l)+'_C'+(i+1),text:c.text,nextDialogueId:c.next||'',effects:fx(c.effects)}))}))})),
@@ -925,11 +934,11 @@ function zipStore(files){ // 무압축 ZIP (UTF-8 파일명)
 const NFILE={normal:'DataNpcCustomer',special:'DataNpcCustomerSpecial',band:'DataNpcBandMember',talk:'DataNpc'};
 const XFILE={spawn:'NpcSpawnByDate',fixed:'NpcSpawnFixed',dialogue:'Dialogue'};
 const fclean=n=>String(n||'').replace(/\.csv$/i,'').replace(/[\\/:*?"<>|]+/g,'_').trim();
-function npcCSV(kind){ const xc=db.ncols[kind]||[]; return toCSV([['ID','Name','Portraits',...xc.map(c=>c.name)],...db.npcs.filter(n=>(n.kind||'normal')===kind).map(n=>[n.id,n.name,facesOf(n.id).join('|'),...xc.map(c=>(n.x||{})[c.key]??'')])]); }
-function spawnCSV(){ const S=db.coord, R=[['월','일','요일','시간대','NpcID','Name','X','Y']];
-  for(const k of Object.keys(S.daily).sort((a,b)=>ALLDATES.indexOf(a)-ALLDATES.indexOf(b)))for(const [sid,sn] of SLOTS)for(const c in (S.daily[k][sid]||{})){ const o=S.daily[k][sid][c],p=kxy(c),[m,d]=k.split('-'); R.push([m,d,dowOf(k)>=0?DOW[dowOf(k)]:'',sn,o.npc||'',cname(o),p.x,p.y]); }
+function npcCSV(kind){ const xc=db.ncols[kind]||[]; return toCSV([['ID','CodeName','Name',...xc.map(c=>c.name),'Portraits'],...db.npcs.filter(n=>(n.kind||'normal')===kind).map(n=>[n.id,n.code||'',n.name,...xc.map(c=>(n.x||{})[c.key]??''),facesOf(n.id).join('|')])]); }
+function spawnCSV(){ const S=db.coord, R=[['월','일','요일','DateID','시간대','NpcID','CodeName','Name','X','Y']], code=o=>o.npc&&npcOf(o.npc)?(npcOf(o.npc).code||''):'';
+  for(const k of Object.keys(S.daily).sort((a,b)=>ALLDATES.indexOf(a)-ALLDATES.indexOf(b)))for(const [sid,sn] of SLOTS)for(const c in (S.daily[k][sid]||{})){ const o=S.daily[k][sid][c],p=kxy(c),[m,d]=k.split('-'); R.push([m,d,dowOf(k)>=0?DOW[dowOf(k)]:'',(DM[k]||{}).id||'',sn,o.npc||'',code(o),cname(o),p.x,p.y]); }
   return toCSV(R); }
-function fixedCSV(){ const S=db.coord; return toCSV([['NpcID','Name','X','Y','등장 시각','제외 날짜'],...Object.keys(S.fixed).map(c=>{const f=S.fixed[c],p=kxy(c);return [f.npc||'',cname(f),p.x,p.y,fixSlotTxt(f),fmtEx(f.except)];})]); }
+function fixedCSV(){ const S=db.coord; return toCSV([['NpcID','CodeName','Name','X','Y','등장 시각','제외 날짜'],...Object.keys(S.fixed).map(c=>{const f=S.fixed[c],p=kxy(c);return [f.npc||'',f.npc&&npcOf(f.npc)?(npcOf(f.npc).code||''):'',cname(f),p.x,p.y,fixSlotTxt(f),fmtEx(f.except)];})]); }
 function exportFiles(){ // 표시 이름(label)과 내보내기 파일 이름(file)을 따로 관리
   db.nfile=db.nfile||{}; db.xfile=db.xfile||{};
   const it=(label,obj,key,def,text)=>({label,def,text,raw:()=>obj[key]??'',set:v=>{obj[key]=v;},get file(){return fclean(obj[key])||def;}});
