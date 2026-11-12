@@ -383,7 +383,7 @@ function renderCal(){
 /* ---------- 데이터베이스 ---------- */
 const NK=[['normal','손님(NPC)'],['special','특별손님'],['band','밴드멤버'],['talk','대사만 있는 손님']];
 const NKL=()=>NK.map(([k,l])=>[k,((db.nlabel||{})[k]||'').trim()||l]);
-const NCOLS=[['id','이름표 (ID, 영문)'],['name','한글 이름'],['num','유니티 ID (숫자)'],['faces','표정 목록 (쉼표로 구분)']];
+const NCOLS=[['num','ID (숫자)'],['id','이름표 (CodeName, 영문)'],['name','한글 이름'],['faces','표정 목록 (쉼표로 구분)']];
 // 유니티 임포터가 열 순서로 읽기 때문에, 아래 기본 열은 항상 맨 앞에 이 순서로 둔다
 const NVAL=['Value_Happy_Min','Value_Happy_Max','Value_Anger_Min','Value_Anger_Max','Value_Love_Min','Value_Love_Max','Value_Sad_Min','Value_Sad_Max'];
 const NDEF={normal:['TalkStartID',...NVAL],special:['TalkStartID',...NVAL],band:['TalkStartID'],talk:['TalkStartID']};
