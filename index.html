@@ -222,12 +222,13 @@ function blankDB(sample){
     ensureNpcCols(d);
     d.tables=[d.tables[0],{name:'음료 (예시)',file:'ProductDataTable',kind:'',cols:['ID','CodeName','Name','판매가격','재료1 ID','재료2 ID','재료3 ID','재료4 ID','음료감정1','음료감정2','음료제한시간'],rows:[['1','moss_latte','이끼 라떼','1200','1','2','','','포근함','','30']]},
       {name:'아이템 (예시)',file:'IngredientDataTable',kind:'',cols:['ID','CodeName','Name','맥스스택','몇번사용가능','물류업자에게 구매하는 가격'],rows:[['1','unknown_seed','이름 모를 씨앗','99','1','300']]}];
-    d.visits=[{d:'6-1',npc:'Moss',order:1},{d:'6-1',npc:'Luna',order:2},{d:'6-5',npc:'Luna',order:1}];
-    d.lines=[{d:'6-1',npc:'Moss',order:1,speaker:'Moss',face:'기본',text:'어서 와, \\C[2]멜로\\C[0].\\| 여기 처음이지?'},
-      {d:'6-1',npc:'Moss',order:2,speaker:'player',face:'',text:'응, 오늘 문 열었어.'},
-      {d:'6-1',npc:'Moss',order:3,speaker:'Moss',face:'웃음',text:'그럼 \\{이끼 라떼\\} 한 잔 부탁해도 될까?'},
+    d.visits=[{d:'6-1',npc:'Customer1',order:1},{d:'6-1',npc:'Customer2',order:2},{d:'6-1',npc:'Luna',order:3},{d:'6-5',npc:'Luna',order:1}];
+    d.lines=[{d:'6-1',npc:'Customer1',order:1,speaker:'Customer',face:'기본',text:'어서 와, \\C[2]멜로\\C[0].\\| 여기 처음이지?'},
+      {d:'6-1',npc:'Customer1',order:2,speaker:'player',face:'',text:'응, 오늘 문 열었어.'},
+      {d:'6-1',npc:'Customer1',order:3,speaker:'Customer',face:'웃음',text:'그럼 \\{이끼 라떼\\} 한 잔 부탁해도 될까?'},
+      {d:'6-1',npc:'Customer2',order:1,speaker:'Customer',face:'기본',text:'여기 분위기 좋네요.'},
       {d:'6-1',npc:'Luna',order:1,speaker:'Luna',face:'졸림',text:'여기 조용해서 좋다….\\! 한숨 자도 돼?'},
-      {d:'6-5',npc:'Luna',order:1,speaker:'Luna',face:'기본',text:'모스한테 얘기 들었어.\n오늘은 안 졸려.'}];
+      {d:'6-5',npc:'Luna',order:1,speaker:'Luna',face:'기본',text:'저번에 얘기 들었어.\n오늘은 안 졸려.'}];
   }
   return d;
 }
@@ -252,6 +253,7 @@ function normalize(d){ // 오래된 세이브·빠진 필드 보정
     delete d.dialogs; d.schema=3;
   }
   for(const t of d.tables)if(t.kind==='item'||t.kind==='recipe')t.kind='';
+  for(const x of [...d.visits,...d.lines])if(x.npc===GEN)x.npc=GEN+'1'; // 손님 한 묶음이던 때의 값
   return d;
 }
 function touch(){ clearTimeout(saveT); saveT=setTimeout(()=>{ try{localStorage.setItem(LS,JSON.stringify({t:Date.now(),db}));}catch(e){ try{localStorage.setItem(LS,JSON.stringify({t:Date.now(),db:Object.assign({},db,{coord:Object.assign({},db.coord,{bg:null}),preview:Object.assign({},db.preview,{bubbleImg:'',standImg:'',stands:{}})})}));touch.lite=true;}catch(e2){} } const s=$('#saved'); if(s)s.textContent=(touch.lite?'자동 저장됨 (이미지는 용량 때문에 제외 · 세이브 저장에는 포함) ':'자동 저장됨 ')+new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}); },500); }
@@ -278,8 +280,11 @@ async function saveFile(name,text){
     h('button',{class:'pri',onclick:async()=>{try{await navigator.clipboard.writeText(text);toast('복사했어요');}catch(e){ta.select();toast('Ctrl+C로 복사해 주세요');}}},'전체 복사'));
 }
 const npcOf=id=>db.npcs.find(n=>n.id===id);
-const facesOf=id=>{const n=npcOf(id);return n?String(n.faces||'').split(',').map(s=>s.trim()).filter(Boolean):[];};
-const speakerName=id=>id==='player'?'플레이어':(npcOf(id)||{name:id||'?'}).name;
+const GEN='Customer'; // 일반 손님은 명단에서 랜덤으로 나온다. 방문 칸은 Customer1, Customer2 …, 화자는 Customer
+const isGen=id=>/^Customer\d*$/.test(String(id)), genNo=id=>+String(id).slice(GEN.length)||0;
+const isNormal=n=>(n.kind||'normal')==='normal';
+const facesOf=id=>{ if(isGen(id)){const u=[...new Set(db.npcs.filter(isNormal).flatMap(n=>String(n.faces||'').split(',').map(x=>x.trim()).filter(Boolean)))];return u.length?u:['기본'];} const n=npcOf(id);return n?String(n.faces||'').split(',').map(s=>s.trim()).filter(Boolean):[];};
+const speakerName=id=>id==='player'?'플레이어':isGen(id)?'손님':(npcOf(id)||{name:id||'?'}).name;
 function inp(o,k,opt={}){ const e=h(opt.area?'textarea':'input',{type:opt.area?null:(opt.type||'text'),class:opt.cls||'',placeholder:opt.ph||'',value:o[k]??'',style:opt.style,title:opt.title});
   e.addEventListener('input',()=>{o[k]=opt.type==='number'?(e.value===''?'':+e.value):e.value; touch(); opt.oninput&&opt.oninput(e);});
   if(opt.rerender)e.addEventListener('change',render); return e; }
@@ -462,6 +467,7 @@ function dbView(){
           h('td',{},sel(NKL(),kindOf(r),v=>r.kind=v)),
           h('td',{},h('button',{class:'sm ghost',title:'삭제',onclick:()=>{snap();db.npcs.splice(db.npcs.indexOf(r),1);touch();render();toast('삭제했어요',true);}},'✕')))))),
       rows.length?null:h('p',{class:'muted'},'아직 없어요.'),
+      ui.dbTab==='normal'?h('p',{class:'warnbox'},'손님은 이 명단에서 랜덤으로 나와요. 그래서 방문자 표에서는 한 명씩 고르지 않고 '+GEN+'1, '+GEN+'2 … 처럼 방문 칸으로만 부르고, 대사의 화자는 '+GEN+' 하나예요.'):null,
       h('div',{class:'row',style:'margin-top:8px'},h('button',{class:'pri',onclick:()=>{let i=1; while(db.npcs.some(n=>n.id==='NewNpc'+i))i++; db.npcs.push({id:'NewNpc'+i,num:'',name:'',faces:'기본',kind:ui.dbTab});touch();render();}},'+ 추가'),h('button',{onclick:addCol},'+ 열 추가'),
         dup.size?h('span',{class:'tag pk'},'겹치는 ID가 있어요 (분류가 달라도 ID는 하나씩)'):null,
         h('span',{class:'muted'},'한글 이름은 여기에만 적고, 방문자·대사 표에서는 이름표(ID)로만 불러요. 이름표를 바꾸면 방문자·대사 표에서 ⚠로 표시됩니다. 유니티 ID(숫자)와 영어 이름의 기본 열은 유니티 임포터용이에요.'))));
@@ -626,7 +632,9 @@ const linesOf=(k,npc)=>db.lines.filter(l=>l.d===k&&l.npc===npc).sort(byOrder);
 const renum=arr=>arr.forEach((x,i)=>x.order=i+1);
 const curLines=()=>ui.date&&ui.vnpc?linesOf(ui.date,ui.vnpc):null;
 const curDlg=()=>{const L=curLines();return L?{lines:L}:null;};
-const npcLabel=id=>id==='player'?'플레이어':(npcOf(id)?(npcOf(id).name||id)+' ('+id+')':'⚠ '+id);
+const kindTag=n=>({special:'특별손님',band:'밴드멤버',talk:'대사만'}[n.kind]||'손님');
+const talkers=()=>db.npcs.filter(n=>n.kind==='band'||n.kind==='special'); // 방문자로 고를 수 있는 개별 NPC
+const npcLabel=id=>id==='player'?'플레이어':id===GEN?'손님 ('+GEN+')':isGen(id)?'손님 '+genNo(id)+' ('+id+')':(npcOf(id)?(npcOf(id).name||id)+' ('+id+')':'⚠ '+id);
 function showTip(el){ const t=$('#tip'); t.innerHTML='<div style="margin-bottom:4px">제어 문자</div>'+
   [['\\N[손님ID]','손님 이름으로 대체'],['\\C[n]','이후 글자 색 ('+TEXTCOLNAME.map((n,i)=>i+' '+n).join(', ')+')'],['\\{','글자 크기 한 단계 키움'],['\\}','글자 크기 한 단계 줄임'],['\\\\','문자 \\ 로 대체'],['\\.','1/4초 기다림'],['\\|','1초 기다림'],['\\!','버튼 입력을 기다림'],['\\>','같은 줄 남은 글자를 한꺼번에 표시'],['\\<','한꺼번에 표시 취소'],['\\^','표시 후 입력을 기다리지 않음']]
   .map(([a,b])=>'<div><b>'+a.replace(/</g,'&lt;')+'</b>'+b+'</div>').join('');
@@ -641,25 +649,27 @@ function dialogView(){
     h('div',{class:'dlg'},visitCol(vs),editCol(),previewCol()));
 }
 function visitCol(vs){
-  const rest=db.npcs.filter(n=>!vs.some(v=>v.npc===n.id));
-  const pick=h('select',{style:'flex:1;min-width:0'},rest.map(n=>h('option',{value:n.id},(n.name||n.id)+' ('+n.id+')')));
+  const has=id=>vs.some(v=>v.npc===id), rest=[['__gen','손님 (랜덤) 1명 추가'],...talkers().filter(n=>!has(n.id)).map(n=>[n.id,'['+kindTag(n)+'] '+(n.name||n.id)+' ('+n.id+')'])];
+  const pick=h('select',{style:'flex:1;min-width:0'},rest.map(([v,l])=>h('option',{value:v},l)));
+  const cnt=k=>db.npcs.filter(n=>n.kind===k).length;
   const move=(i,dir)=>{const j=i+dir;if(j<0||j>=vs.length)return;[vs[i],vs[j]]=[vs[j],vs[i]];renum(vs);touch();render();};
   return h('div',{class:'panel','data-sc':'list'},
     h('div',{class:'row',style:'margin-bottom:6px'},h('h3',{class:'grow'},'방문자 ('+vs.length+')')),
     vs.map((v,i)=>h('div',{class:'li'+(v.npc===ui.vnpc?' on':''),onclick:e=>{ if(e.target.closest('button'))return; ui.vnpc=v.npc;ui.line=0;render(); }},
       h('span',{class:'tag'},i+1),
-      h('div',{class:'grow'},npcOf(v.npc)?(npcOf(v.npc).name||v.npc):'⚠ 없는 NPC',h('small',{},v.npc+' · 대사 '+linesOf(ui.date,v.npc).length+'줄')),
+      h('div',{class:'grow'},isGen(v.npc)?'손님 '+(genNo(v.npc)||''):npcOf(v.npc)?(npcOf(v.npc).name||v.npc):'⚠ 없는 NPC',h('small',{},(isGen(v.npc)?'랜덤 · '+v.npc:npcOf(v.npc)?kindTag(npcOf(v.npc))+' · '+v.npc:v.npc)+' · 대사 '+linesOf(ui.date,v.npc).length+'줄')),
       h('button',{class:'sm ghost',title:'순서 위로',onclick:()=>move(i,-1)},'↑'),h('button',{class:'sm ghost',title:'순서 아래로',onclick:()=>move(i,1)},'↓'),
       h('button',{class:'sm ghost',title:'이 날 방문에서 빼기',onclick:()=>{snap();db.visits.splice(db.visits.indexOf(v),1);db.lines=db.lines.filter(l=>!(l.d===ui.date&&l.npc===v.npc));renum(visitsOf(ui.date));touch();render();toast('방문자와 그날 대사를 지웠어요',true);}},'✕'))),
     vs.length?null:h('p',{class:'muted'},'이 날짜에는 아직 방문자가 없어요.'),
-    rest.length?h('div',{class:'row',style:'margin-top:8px'},pick,h('button',{class:'pri sm',onclick:()=>{db.visits.push({d:ui.date,npc:pick.value,order:vs.length+1});ui.vnpc=pick.value;ui.line=0;touch();render();}},'+ 방문자')):
-      h('p',{class:'muted'},db.npcs.length?'모든 NPC가 이미 방문자로 들어 있어요.':'데이터베이스에 NPC를 먼저 추가해 주세요.'));
+    rest.length?h('div',{class:'row',style:'margin-top:8px'},pick,h('button',{class:'pri sm',onclick:()=>{const id=pick.value==='__gen'?GEN+(Math.max(0,...vs.filter(v=>isGen(v.npc)).map(v=>genNo(v.npc)))+1):pick.value;db.visits.push({d:ui.date,npc:id,order:vs.length+1});ui.vnpc=id;ui.line=0;touch();render();}},'+ 방문자')):
+      h('p',{class:'muted'},'고를 수 있는 방문자가 모두 들어 있어요.'),
+    h('p',{class:'muted'},'고를 수 있는 방문자: 손님(랜덤, 여러 명 가능) · 밴드멤버 '+cnt('band')+'명 · 특별손님 '+cnt('special')+'명 · 지금 손님 '+vs.filter(v=>isGen(v.npc)).length+'명'));
 }
 function editCol(){
   const L=curLines();
   if(!L) return h('div',{class:'panel'},h('p',{class:'muted'},'왼쪽에서 방문자를 추가하거나 골라 주세요.'));
-  const who=ui.vnpc, others=db.npcs.filter(n=>n.id!==who);
-  const spOpts=[[who,npcLabel(who)],['player','플레이어 (player)'],...others.map(n=>[n.id,npcLabel(n.id)])];
+  const who=ui.vnpc, me=isGen(who)?GEN:who, others=talkers().filter(n=>n.id!==who);
+  const spOpts=[[me,npcLabel(me)],['player','플레이어 (player)'],...(me===GEN?[]:[[GEN,npcLabel(GEN)]]),...others.map(n=>[n.id,npcLabel(n.id)])];
   const select=i=>{ if(ui.line!==i){ui.line=i;document.querySelectorAll('.line').forEach((e,j)=>e.classList.toggle('on',j===i));pvLoad(true);} };
   const cards=L.map((l,i)=>{
     const warn=h('div',{});
@@ -681,7 +691,7 @@ function editCol(){
   return h('div',{'data-sc':'edit'},
     h('div',{class:'panel'},h('div',{class:'row'},h('h3',{},npcLabel(who)),h('span',{class:'muted grow'},dlw(ui.date)+' · 대사 '+L.length+'줄 · 위에서부터 순서대로 재생돼요'))),
     cards,
-    h('div',{style:'margin:10px 0 30px'},h('button',{class:'pri',onclick:()=>{const last=L[L.length-1],sp=last?last.speaker:who;db.lines.push({d:ui.date,npc:who,order:L.length+1,speaker:sp,face:last&&last.speaker===sp?last.face:(facesOf(sp)[0]||''),text:''});ui.line=L.length;touch();render();}},'+ 줄 추가')));
+    h('div',{style:'margin:10px 0 30px'},h('button',{class:'pri',onclick:()=>{const last=L[L.length-1],sp=last?last.speaker:me;db.lines.push({d:ui.date,npc:who,order:L.length+1,speaker:sp,face:last&&last.speaker===sp?last.face:(facesOf(sp)[0]||''),text:''});ui.line=L.length;touch();render();}},'+ 줄 추가')));
 }
 
 /* ---------- 방문자 · 대사 표 (데이터베이스 탭) ---------- */
@@ -697,7 +707,7 @@ function importTalkCSV(which){
     snap(); db[which]=out; touch(); render(); toast(out.length+'행을 불러왔어요'+(bad?' · 날짜ID를 못 찾아 건너뛴 줄 '+bad+'개':''),true); });
 }
 function talkTable(which){
-  const dateOpts=ALLDATES.map(k=>[k,dcode(k)]), npcIds=db.npcs.map(n=>n.id), isV=which==='visits';
+  const dateOpts=ALLDATES.map(k=>[k,dcode(k)]), gens=[...new Set([...db.visits,...db.lines].map(x=>x.npc).filter(isGen))].sort((a,b)=>genNo(a)-genNo(b)), npcIds=[...gens,GEN+(Math.max(0,...gens.map(genNo))+1),...talkers().map(n=>n.id)], spIds=['player',GEN,...talkers().map(n=>n.id)], isV=which==='visits';
   let rows=isV?sortedVisits():sortedLines(); const all=rows.length; if(ui.date)rows=rows.filter(r=>r.d===ui.date);
   const del=r=>h('button',{class:'sm ghost',title:'행 삭제',onclick:()=>{snap();db[which].splice(db[which].indexOf(r),1);touch();render();toast('행을 삭제했어요',true);}},'✕');
   const num=r=>{const e=h('input',{type:'number',value:r.order,style:'min-width:60px'});e.addEventListener('input',()=>{r.order=e.value===''?'':+e.value;touch();});e.addEventListener('change',render);return e;};
@@ -710,10 +720,10 @@ function talkTable(which){
       h('button',{class:'sm',onclick:()=>saveFile(exportFiles()[isV?'date':'dlg'].find(f=>f.key===which).file+'.csv','﻿'+(isV?visitsCSV():linesCSV()))},'CSV 내보내기')),
     h('div',{class:'gridwrap','data-sc':'tbl'},h('table',{class:'grid'},h('tr',{},head.map(x=>h('th',{style:'padding:4px 8px'},x)),h('th',{},'')),
       rows.map(r=>h('tr',{},h('td',{},sel(dateOpts,r.d,v=>r.d=v)),h('td',{},sel(npcIds,r.npc,v=>r.npc=v)),h('td',{},num(r)),
-        isV?null:[h('td',{},sel(['player',...npcIds],r.speaker,v=>{r.speaker=v;if(!facesOf(v).includes(r.face))r.face=facesOf(v)[0]||'';})),h('td',{},r.speaker==='player'?'':sel(facesOf(r.speaker),r.face,v=>r.face=v)),h('td',{},txt(r))],
+        isV?null:[h('td',{},sel(spIds,r.speaker,v=>{r.speaker=v;if(!facesOf(v).includes(r.face))r.face=facesOf(v)[0]||'';})),h('td',{},r.speaker==='player'?'':sel(facesOf(r.speaker),r.face,v=>r.face=v)),h('td',{},txt(r))],
         h('td',{},del(r)))))),
     h('div',{class:'row',style:'margin-top:8px'},h('button',{class:'pri sm',onclick:()=>{ const d=ui.date||ALLDATES[0], npc=npcIds[0]||''; if(!npc){toast('NPC를 먼저 추가해 주세요');return;}
-        if(isV)db.visits.push({d,npc,order:visitsOf(d).length+1}); else db.lines.push({d,npc,order:linesOf(d,npc).length+1,speaker:npc,face:facesOf(npc)[0]||'',text:''}); touch();render(); }},'+ 행 추가'),
+        if(isV)db.visits.push({d,npc,order:visitsOf(d).length+1}); else db.lines.push({d,npc,order:linesOf(d,npc).length+1,speaker:isGen(npc)?GEN:npc,face:facesOf(npc)[0]||'',text:''}); touch();render(); }},'+ 행 추가'),
       h('span',{class:'muted'},isV?'날짜ID와 NPC ID는 드롭다운으로만 골라요. 대화 툴에서 방문자를 추가하면 여기에 쌓입니다.':'대화 툴에서 쓴 대사가 여기에 한 줄씩 쌓여요. 긴 대사는 대화 툴에서 고치는 게 편해요.')));
 }
 
