@@ -407,17 +407,22 @@ function renderCal(){
 const UL=[{name:'UnlockType',options:['Default','Story'],empty:'(빈칸) Default'},{name:'DemoUnlockType',options:['Default','Story','Locked'],empty:'(빈칸) 정식판과 같음'}];
 const UL_AUTO=/상품|재료|물류|공연|곡|음악|손님|product|ingredient|delivery|music|song|customer/i; // 이 이름의 표는 처음에 자동으로 켠다
 const ulMeta=u=>({type:'enum',options:[...u.options],unlock:u.name,empty:u.empty});
-function ensureUnlockCols(t){ if(!t||!t.unlock)return; t.meta=t.meta||[]; while(t.meta.length<t.cols.length)t.meta.push(null);
-  for(const u of UL){ let ci=t.cols.findIndex(c=>String(c).trim()===u.name);
-    if(ci<0){ ci=t.cols.length; t.cols.push(u.name); t.meta[ci]=null; t.rows.forEach(r=>{while(r.length<ci)r.push('');r.push('');}); }
-    t.meta[ci]=ulMeta(u); } }
+function ulAnchor(cols){ const lc=cols.map(c=>String(c).trim().toLowerCase()); for(const n of ['name','codename','id']){ const i=lc.indexOf(n); if(i>=0)return i; } return cols.length-1; }
+function ensureUnlockCols(t){ // 해금 열 두 개를 항상 Name 바로 오른쪽에 둔다 (Name이 없으면 CodeName, ID 순으로 찾고, 없으면 맨 뒤)
+  if(!t||!t.unlock)return; t.meta=t.meta||[]; while(t.meta.length<t.cols.length)t.meta.push(null);
+  const vals=UL.map(u=>{ const ci=t.cols.findIndex(c=>String(c).trim()===u.name); return ci<0?null:t.rows.map(r=>r[ci]??''); });
+  for(let ci=t.cols.length-1;ci>=0;ci--) if(UL.some(u=>String(t.cols[ci]).trim()===u.name)){ t.cols.splice(ci,1); t.meta.splice(ci,1); t.rows.forEach(r=>r.splice(ci,1)); }
+  const at=ulAnchor(t.cols)+1;
+  t.cols.splice(at,0,...UL.map(u=>u.name)); t.meta.splice(at,0,...UL.map(ulMeta));
+  t.rows.forEach((r,ri)=>{ while(r.length<at)r.push(''); r.splice(at,0,...UL.map((u,ui)=>vals[ui]?vals[ui][ri]:'')); });
+}
 function applyUnlockDefaults(d){
   if(!d.nunlock)d.nunlock={normal:true};
   for(const t of d.tables){ if(t.unlock===undefined)t.unlock=t.kind!=='date'&&(t.cols.some(c=>String(c).trim()==='UnlockType')||UL_AUTO.test((t.name||'')+' '+(t.file||''))); ensureUnlockCols(t); }
 }
 function setTableUnlock(t,on){ snap(); t.unlock=on;
   if(on)ensureUnlockCols(t); else for(const u of UL){ const ci=t.cols.findIndex(c=>String(c).trim()===u.name); if(ci>=0){ t.cols.splice(ci,1); (t.meta||[]).splice(ci,1); t.rows.forEach(r=>r.splice(ci,1)); } }
-  touch(); render(); toast(on?'해금 열 두 개를 맨 뒤에 붙였어요':'해금 열을 뺐어요',true); }
+  touch(); render(); toast(on?'해금 열 두 개를 Name 오른쪽에 붙였어요':'해금 열을 뺐어요',true); }
 const ulItem=(src,id,name,a,b)=>{ const full=String(a||'').trim()||'Default', demoRaw=String(b||'').trim(); return {src,id,name,full,demoRaw,demo:demoRaw||full}; };
 function unlockItems(){ const out=[];
   for(const t of db.tables){ if(!t.unlock)continue; const lc=t.cols.map(c=>String(c).trim().toLowerCase()); let ii=lc.indexOf('id'); if(ii<0)ii=0; let ni=lc.indexOf('name'); if(ni<0)ni=lc.indexOf('codename');
@@ -509,7 +514,7 @@ function tableView(ti){
   return h('div',{class:'panel'},
     h('div',{class:'row',style:'margin-bottom:8px'},h('label',{class:'f'},'표시 이름',inp(t,'name',{rerender:true,style:'width:170px',ph:'표 이름'})),h('label',{class:'f'},'내보내기 파일 이름',h('span',{},inp(t,'file',{style:'width:170px',ph:fclean(t.name)||'table'}),' .csv')),
       h('label',{},'용도 ',sel([['','일반 표'],['date','날짜 데이터 (달력 · 좌표 툴에 표시)']],t.kind||'',v=>{ if(v==='date')db.tables.forEach(x=>{if(x.kind==='date')x.kind='';}); t.kind=v; })),
-      t.kind==='date'?null:h('label',{title:'UnlockType · DemoUnlockType 열을 맨 뒤에 붙여요'},h('input',{type:'checkbox',checked:!!t.unlock,onchange:e=>setTableUnlock(t,e.target.checked)}),' 해금 열'),
+      t.kind==='date'?null:h('label',{title:'UnlockType · DemoUnlockType 열을 Name 바로 오른쪽에 붙여요'},h('input',{type:'checkbox',checked:!!t.unlock,onchange:e=>setTableUnlock(t,e.target.checked)}),' 해금 열'),
       h('span',{class:'muted grow'},t.rows.length+'행 × '+t.cols.length+'열'),
       h('button',{class:'sm',onclick:()=>importCSV(ti)},'CSV 다시 불러오기'),
       h('button',{class:'sm',onclick:()=>saveFile((t.name||'table')+'.csv','﻿'+toCSV([t.cols,...t.rows]))},'CSV 내보내기'),
@@ -521,6 +526,20 @@ function tableView(ti){
     h('div',{class:'row',style:'margin-top:8px'},h('button',{class:'pri sm',onclick:()=>{t.rows.push(t.cols.map(()=>''));touch();render();}},'+ 행 추가'),
       h('button',{class:'sm',onclick:()=>{const ci=t.cols.length;t.cols.push('새 열');t.rows.forEach(r=>r.push(''));touch();render();colModal({name:'새 열'},o=>{t.cols[ci]=o.name;t.meta[ci]={type:o.type,options:o.options};},()=>delCol(ci));}},'+ 열 추가'),
       h('span',{class:'muted'},'CSV의 열과 값을 그대로 보관해요.')));
+}
+function newTableModal(){
+  const name=h('input',{type:'text',placeholder:'예: 공연곡',style:'width:100%'}), file=h('input',{type:'text',placeholder:'예: MusicDataTable',style:'width:100%'});
+  const cols=h('textarea',{value:'ID\nCodeName\nName',style:'height:150px'}), ul=h('input',{type:'checkbox'});
+  const make=()=>{ const cs=[...new Set(cols.value.split(/\n|,/).map(x=>x.trim()).filter(Boolean))]; if(!cs.length){toast('열 이름을 하나 이상 적어 주세요');return;}
+    const t={name:name.value.trim()||'새 표',file:fclean(file.value),kind:'',cols:cs,rows:[cs.map(()=>'')],meta:cs.map(()=>null),unlock:ul.checked};
+    ensureUnlockCols(t); db.tables.push(t); ui.dbTab='t'+(db.tables.length-1); closeModal(); touch(); render(); toast('새 표를 만들었어요'); };
+  modal('새 표 만들기',h('div',{style:'display:flex;flex-direction:column;gap:10px'},
+      h('label',{class:'f'},'표시 이름',name),h('label',{class:'f'},'내보내기 파일 이름 (.csv 제외, 비우면 표시 이름)',file),
+      h('label',{class:'f'},'열 이름 (한 줄에 하나, 왼쪽부터 순서대로)',cols),
+      h('label',{},ul,' 해금 열 붙이기 (UnlockType · DemoUnlockType이 Name 바로 오른쪽에 들어가요)'),
+      h('span',{class:'muted'},'빈 줄 하나로 시작해요. 열은 만든 뒤에도 추가·삭제·이름 변경과 선택 목록 설정이 돼요.')),
+    [h('button',{onclick:closeModal},'취소'),h('button',{class:'pri',onclick:make},'만들기')]);
+  name.focus();
 }
 let dbDrag=null;
 function dbTabList(){ // 데이터베이스 탭 목록. 표는 위치(t0, t1…)가 바뀌어도 순서가 유지되도록 고유 키(u:…)로 기억한다
@@ -546,7 +565,7 @@ function dbView(){
         db.tabOrder=keys; dbDrag=null; touch(); render(); }},
     it.l,h('span',{class:'muted'},' '+it.n));
   const tabs=h('div',{class:'row',style:'margin-bottom:10px'},h('div',{class:'tabs',style:'margin-bottom:0'},list.map(tab)),
-    h('button',{class:'pri',onclick:()=>importCSV()},'+ CSV 불러오기'));
+    h('button',{class:'pri',onclick:()=>importCSV()},'+ CSV 불러오기'),h('button',{onclick:newTableModal},'+ 새 표 만들기'));
   if(isT())return h('div',{},tabs,tableView(+ui.dbTab.slice(1)));
   if(ui.dbTab==='visits'||ui.dbTab==='lines')return h('div',{},tabs,talkTable(ui.dbTab));
   const rows=db.npcs.filter(n=>kindOf(n)===ui.dbTab), ids=db.npcs.map(r=>r.id), dup=new Set(ids.filter((x,i)=>ids.indexOf(x)!==i));
@@ -557,16 +576,19 @@ function dbView(){
   return h('div',{},tabs,
     h('div',{class:'panel'},
       h('div',{class:'row',style:'margin-bottom:10px'},h('label',{class:'f'},'표시 이름',inp(db.nlabel,ui.dbTab,{rerender:true,style:'width:170px',ph:NK.find(k=>k[0]===ui.dbTab)[1]})),h('label',{class:'f'},'내보내기 파일 이름',h('span',{},inp(db.nfile,ui.dbTab,{style:'width:200px',ph:NFILE[ui.dbTab]}),' .csv')),
-        h('label',{title:'UnlockType · DemoUnlockType 열을 맨 뒤에 붙여요 (값은 꺼도 지워지지 않아요)',style:'align-self:flex-end'},h('input',{type:'checkbox',checked:ulOn,onchange:e=>{db.nunlock[ui.dbTab]=e.target.checked;touch();render();}}),' 해금 열')),
-      h('div',{style:'overflow:auto'},h('table',{style:'min-width:'+(820+xc.length*130+(ulOn?380:0))+'px'},h('tr',{},NCOLS.map(c=>h('th',{},c[1])),
-          xc.map(c=>h('th',{},c.name,c.type==='enum'?h('span',{class:'tag sky',style:'margin-left:4px'},'목록'):null,c.fixed?null:h('button',{class:'sm ghost',title:'열 설정 (이름 · 값 종류 · 선택 목록 · 삭제)',onclick:()=>colModal(c,o=>Object.assign(c,o),()=>xc.splice(xc.indexOf(c),1))},'⚙'))),
+        h('label',{title:'UnlockType · DemoUnlockType 열을 한글 이름 바로 오른쪽에 붙여요 (값은 꺼도 지워지지 않아요)',style:'align-self:flex-end'},h('input',{type:'checkbox',checked:ulOn,onchange:e=>{db.nunlock[ui.dbTab]=e.target.checked;touch();render();}}),' 해금 열')),
+      h('div',{style:'overflow:auto'},h('table',{style:'min-width:'+(820+xc.length*130+(ulOn?380:0))+'px'},h('tr',{},NCOLS.slice(0,3).map(c=>h('th',{},c[1])),
           ulOn?UL.map(u=>h('th',{class:'ulth'},u.name,h('span',{class:'tag sky',style:'margin-left:4px'},'해금'))):null,
+          NCOLS.slice(3).map(c=>h('th',{},c[1])),
+          xc.map(c=>h('th',{},c.name,c.type==='enum'?h('span',{class:'tag sky',style:'margin-left:4px'},'목록'):null,c.fixed?null:h('button',{class:'sm ghost',title:'열 설정 (이름 · 값 종류 · 선택 목록 · 삭제)',onclick:()=>colModal(c,o=>Object.assign(c,o),()=>xc.splice(xc.indexOf(c),1))},'⚙'))),
           h('th',{style:'width:150px'},'분류'),h('th',{style:'width:40px'},'')),
-        rows.map(r=>h('tr',{},NCOLS.map(c=>h('td',{style:c[0]==='id'&&dup.has(r.id)?'background:var(--pinkl)':''},inp(r,c[0],{type:c[2]||'text',rerender:c[0]==='id'}))),
-          xc.map(c=>h('td',{},typedCell(c,()=>(r.x||{})[c.key],v=>{(r.x||(r.x={}))[c.key]=v;}))),
+        rows.map(r=>{ const nc=c=>h('td',{style:c[0]==='id'&&dup.has(r.id)?'background:var(--pinkl)':''},inp(r,c[0],{type:c[2]||'text',rerender:c[0]==='id'}));
+          return h('tr',{},NCOLS.slice(0,3).map(nc),
           ulOn?UL.map(u=>h('td',{},typedCell(ulMeta(u),()=>(r.ul||{})[u.name],v=>{(r.ul||(r.ul={}))[u.name]=v;}))):null,
+          NCOLS.slice(3).map(nc),
+          xc.map(c=>h('td',{},typedCell(c,()=>(r.x||{})[c.key],v=>{(r.x||(r.x={}))[c.key]=v;}))),
           h('td',{},sel(NKL(),kindOf(r),v=>r.kind=v)),
-          h('td',{},h('button',{class:'sm ghost',title:'삭제',onclick:()=>{snap();db.npcs.splice(db.npcs.indexOf(r),1);touch();render();toast('삭제했어요',true);}},'✕')))))),
+          h('td',{},h('button',{class:'sm ghost',title:'삭제',onclick:()=>{snap();db.npcs.splice(db.npcs.indexOf(r),1);touch();render();toast('삭제했어요',true);}},'✕')));}))),
       rows.length?null:h('p',{class:'muted'},'아직 없어요.'),
       ui.dbTab==='normal'?h('p',{class:'warnbox'},'손님은 이 명단에서 랜덤으로 나와요. 그래서 방문자 표에서는 한 명씩 고르지 않고 '+GEN+'1, '+GEN+'2 … 처럼 방문 칸으로만 부르고, 대사의 화자는 '+GEN+' 하나예요.'):null,
       h('div',{class:'row',style:'margin-top:8px'},h('button',{class:'pri',onclick:()=>{let i=1; while(db.npcs.some(n=>n.id==='NewNpc'+i))i++; db.npcs.push({id:'NewNpc'+i,num:'',name:'',faces:'기본',kind:ui.dbTab});touch();render();}},'+ 추가'),h('button',{onclick:addCol},'+ 열 추가'),
@@ -1023,7 +1045,7 @@ function zipStore(files){ // 무압축 ZIP (UTF-8 파일명)
 const NFILE={normal:'DataNpcCustomer',special:'DataNpcCustomerSpecial',band:'DataNpcBandMember',talk:'DataNpc'};
 const XFILE={spawn:'NpcSpawnByDate',fixed:'NpcSpawnFixed',visits:'DateVisitor',lines:'Dialogue'};
 const fclean=n=>String(n||'').replace(/\.csv$/i,'').replace(/[\\/:*?"<>|]+/g,'_').trim();
-function npcCSV(kind){ const xc=db.ncols[kind]||[], on=!!(db.nunlock||{})[kind]; return toCSV([['ID','CodeName','Name',...xc.map(c=>c.name),'Portraits',...(on?UL.map(u=>u.name):[])],...db.npcs.filter(n=>(n.kind||'normal')===kind).map(n=>[n.num||'',n.id,n.name,...xc.map(c=>(n.x||{})[c.key]??''),facesOf(n.id).join('|'),...(on?UL.map(u=>(n.ul||{})[u.name]||''):[])])]); }
+function npcCSV(kind){ const xc=db.ncols[kind]||[], on=!!(db.nunlock||{})[kind]; return toCSV([['ID','CodeName','Name',...(on?UL.map(u=>u.name):[]),...xc.map(c=>c.name),'Portraits'],...db.npcs.filter(n=>(n.kind||'normal')===kind).map(n=>[n.num||'',n.id,n.name,...(on?UL.map(u=>(n.ul||{})[u.name]||''):[]),...xc.map(c=>(n.x||{})[c.key]??''),facesOf(n.id).join('|')])]); }
 function spawnCSV(){ const S=db.coord, R=[['월','일','요일','DateID','시간대','NpcID','CodeName','Name','X','Y']], code=o=>o.npc&&npcOf(o.npc)?(npcOf(o.npc).num||''):'';
   for(const k of Object.keys(S.daily).sort((a,b)=>ALLDATES.indexOf(a)-ALLDATES.indexOf(b)))for(const [sid,sn] of SLOTS)for(const c in (S.daily[k][sid]||{})){ const o=S.daily[k][sid][c],p=kxy(c),[m,d]=k.split('-'); R.push([m,d,dowOf(k)>=0?DOW[dowOf(k)]:'',(DM[k]||{}).id||'',sn,code(o),o.npc||'',cname(o),p.x,p.y]); }
   return toCSV(R); }
