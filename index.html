@@ -164,6 +164,8 @@ td.num{text-align:right;font:12px ui-monospace,Consolas,monospace;width:1px;whit
 .grid td,.grid th{padding:0;border:1px solid var(--line)}
 .grid th{position:sticky;top:0;background:#f6f7f9;z-index:1;padding:0 6px}
 .grid select{border:0;border-radius:0;background:transparent;width:100%;min-width:96px}
+td:has(select.demoset){background:#ffe7a8} select.demoset{font-weight:700} select.ul-Locked{color:#b93a50} select.ul-Story{color:#2b6fb0} select.ul-Default{color:#3a8f5b}
+th.ulth{background:#eef6fe;white-space:nowrap} select.cmdset{background:var(--skyl);border-color:var(--sky)}
 .grid input{border:0;border-radius:0;background:transparent;width:100%;min-width:96px;padding:5px 8px}
 </style>
 </head>
@@ -222,20 +224,23 @@ function blankDB(sample){
   const d={app:'merongtool',version:1,name:'새 프로젝트',npcs:[],ncols:{},nseq:1,nlabel:{},nfile:{},xfile:{},schema:3,tables:[defaultDateTable()],visits:[],lines:[],coord:freshCoord(),
     preview:{v:2,w:480,rows:3,font:20,lineH:28,pad:14,scale:1,speed:40,pixel:true,bubbleImg:'',standImg:'',stands:{},standBack:false,sx:'',sy:'',tx:'',ty:'',tw:'',showName:true,nx:'',ny:''}};
   ensureNpcCols(d);
+  d.nunlock={normal:true};
   if(sample){
     d.name='예시 프로젝트';
     d.npcs=[{id:'Moss',num:'1001',name:'모스',color:'#8fc9a3',faces:'기본, 웃음, 당황'},{id:'Luna',num:'2001',name:'루나',color:'#8fd0ee',faces:'기본, 졸림',kind:'special'},{id:'Rio',num:'3001',name:'리오',color:'#f9c0dc',faces:'기본',kind:'band',x:{c0:'기타'}}];
     d.ncols.band=[{key:'c0',name:'담당 악기',type:'enum',options:['보컬','기타','베이스','드럼','키보드']}];
     ensureNpcCols(d);
-    d.tables=[d.tables[0],{name:'음료 (예시)',file:'ProductDataTable',kind:'',cols:['ID','CodeName','Name','판매가격','재료1 ID','재료2 ID','재료3 ID','재료4 ID','음료감정1','음료감정2','음료제한시간'],rows:[['1','moss_latte','이끼 라떼','1200','1','2','','','포근함','','30']]},
-      {name:'아이템 (예시)',file:'IngredientDataTable',kind:'',cols:['ID','CodeName','Name','맥스스택','몇번사용가능','물류업자에게 구매하는 가격'],rows:[['1','unknown_seed','이름 모를 씨앗','99','1','300']]}];
+    d.tables=[d.tables[0],{name:'음료 (예시)',file:'ProductDataTable',kind:'',cols:['ID','CodeName','Name','판매가격','재료1 ID','재료2 ID','재료3 ID','재료4 ID','음료감정1','음료감정2','음료제한시간'],rows:[['200001','moss_latte','이끼 라떼','1200','1','2','','','포근함','','30']]},
+      {name:'아이템 (예시)',file:'IngredientDataTable',kind:'',cols:['ID','CodeName','Name','맥스스택','몇번사용가능','물류업자에게 구매하는 가격'],rows:[['300001','unknown_seed','이름 모를 씨앗','99','1','300']]}];
     d.visits=[{d:'6-1',npc:'Customer1',order:1},{d:'6-1',npc:'Customer2',order:2},{d:'6-1',npc:'Luna',order:3},{d:'6-5',npc:'Luna',order:1}];
     d.lines=[{d:'6-1',npc:'Customer1',order:1,type:'Walk',arg:'3,2',speaker:'Customer',face:'',text:''},{d:'6-1',npc:'Customer1',order:4,type:'Cutscene',arg:'FirstOrder',speaker:'Customer',face:'',text:''},{d:'6-1',npc:'Customer1',order:1.5,speaker:'Customer',face:'기본',text:'어서 와, \\C[2]멜로\\C[0].\\| 여기 처음이지?'},
       {d:'6-1',npc:'Customer1',order:2,speaker:'player',face:'',text:'응, 오늘 문 열었어.'},
-      {d:'6-1',npc:'Customer1',order:3,speaker:'Customer',face:'웃음',text:'그럼 \\{이끼 라떼\\} 한 잔 부탁해도 될까?'},
+      {d:'6-1',npc:'Customer1',order:3,speaker:'Customer',face:'웃음',text:'그럼 \\{이끼 라떼\\} 한 잔 부탁해도 될까?',cmd:'Unlock:200001'},
       {d:'6-1',npc:'Customer2',order:1,speaker:'Customer',face:'기본',text:'여기 분위기 좋네요.'},
       {d:'6-1',npc:'Luna',order:1,speaker:'Luna',face:'졸림',text:'여기 조용해서 좋다….\\! 한숨 자도 돼?'},
       {d:'6-5',npc:'Luna',order:1,speaker:'Luna',face:'기본',text:'저번에 얘기 들었어.\n오늘은 안 졸려.'}];
+    applyUnlockDefaults(d);
+    { const t=d.tables[1]; t.rows[0][t.cols.indexOf('UnlockType')]='Story'; const t2=d.tables[2]; t2.rows[0][t2.cols.indexOf('DemoUnlockType')]='Locked'; }
     { const g={}; d.lines.forEach(l=>(g[l.d+'|'+l.npc]=g[l.d+'|'+l.npc]||[]).push(l)); Object.values(g).forEach(arr=>arr.sort((x,y)=>x.order-y.order).forEach((l,i)=>l.order=i+1)); }
   }
   return d;
@@ -262,6 +267,7 @@ function normalize(d){ // 오래된 세이브·빠진 필드 보정
   }
   for(const t of d.tables)if(t.kind==='item'||t.kind==='recipe')t.kind='';
   for(const x of [...d.visits,...d.lines])if(x.npc===GEN)x.npc=GEN+'1'; // 손님 한 묶음이던 때의 값
+  applyUnlockDefaults(d);
   return d;
 }
 function touch(){ clearTimeout(saveT); saveT=setTimeout(()=>{ try{localStorage.setItem(LS,JSON.stringify({t:Date.now(),db}));}catch(e){ try{localStorage.setItem(LS,JSON.stringify({t:Date.now(),db:Object.assign({},db,{coord:Object.assign({},db.coord,{bg:null}),preview:Object.assign({},db.preview,{bubbleImg:'',standImg:'',stands:{}})})}));touch.lite=true;}catch(e2){} } const s=$('#saved'); if(s)s.textContent=(touch.lite?'자동 저장됨 (이미지는 용량 때문에 제외 · 세이브 저장에는 포함) ':'자동 저장됨 ')+new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}); },500); }
@@ -322,7 +328,7 @@ function render(){
   if(ui.tool==='coord'&&!ui.date)ui.date=ALLDATES[0];
   DM=dateMap();
   put($('#nav'),TOOLS.map(([k,l])=>h('button',{class:ui.tool===k?'on':'',onclick:()=>go(k)},l)));
-  renderCal(); renderTop();
+  renderCal(); renderTop(); updateUlBadge();
   const v=$('#view'); v.dataset.sc='view';
   put(v,ui.tool==='db'?dbView():ui.tool==='coord'?coordView():dialogView());
   document.querySelectorAll('[data-sc]').forEach(e=>{ if(keep[e.dataset.sc]){e.scrollTop=keep[e.dataset.sc][0];e.scrollLeft=keep[e.dataset.sc][1];} });
@@ -335,6 +341,7 @@ function renderTop(){
     inp(db,'name',{ph:'프로젝트 이름',style:'width:180px'}),
     h('span',{class:'muted grow',id:'saved'},''),
     h('button',{class:'pri',onclick:()=>saveFile((db.name||'merongtool')+'.json',JSON.stringify(db,null,1))},'세이브 저장'),
+    h('button',{id:'ulbtn',onclick:unlockModal},'해금 검사'),
     h('button',{onclick:exportModal},'내보내기'),
     h('button',{class:'ghost',onclick:()=>{ put($('#top'),); showTitle(); }},'타이틀로'));
 }
@@ -394,6 +401,62 @@ function renderCal(){
     h('p',{class:'muted'},'초록 점: 방문자나 NPC 배치 있음 · 빗금: 휴무. 요일과 휴무는 데이터베이스의 날짜 표에서 가져와요.'));
 }
 
+/* ---------- 해금 (UnlockType · DemoUnlockType) ----------
+   어느 표에든 켤 수 있는 공통 열 두 개. CSV 표는 t.unlock, 손님 탭은 db.nunlock[분류]로 켠다.
+   정식판 = UnlockType (빈칸이면 Default) / 데모판 = DemoUnlockType이 있으면 그 값, 없으면 정식판 값 */
+const UL=[{name:'UnlockType',options:['Default','Story'],empty:'(빈칸) Default'},{name:'DemoUnlockType',options:['Default','Story','Locked'],empty:'(빈칸) 정식판과 같음'}];
+const UL_AUTO=/상품|재료|물류|공연|곡|음악|손님|product|ingredient|delivery|music|song|customer/i; // 이 이름의 표는 처음에 자동으로 켠다
+const ulMeta=u=>({type:'enum',options:[...u.options],unlock:u.name,empty:u.empty});
+function ensureUnlockCols(t){ if(!t||!t.unlock)return; t.meta=t.meta||[]; while(t.meta.length<t.cols.length)t.meta.push(null);
+  for(const u of UL){ let ci=t.cols.findIndex(c=>String(c).trim()===u.name);
+    if(ci<0){ ci=t.cols.length; t.cols.push(u.name); t.meta[ci]=null; t.rows.forEach(r=>{while(r.length<ci)r.push('');r.push('');}); }
+    t.meta[ci]=ulMeta(u); } }
+function applyUnlockDefaults(d){
+  if(!d.nunlock)d.nunlock={normal:true};
+  for(const t of d.tables){ if(t.unlock===undefined)t.unlock=t.kind!=='date'&&(t.cols.some(c=>String(c).trim()==='UnlockType')||UL_AUTO.test((t.name||'')+' '+(t.file||''))); ensureUnlockCols(t); }
+}
+function setTableUnlock(t,on){ snap(); t.unlock=on;
+  if(on)ensureUnlockCols(t); else for(const u of UL){ const ci=t.cols.findIndex(c=>String(c).trim()===u.name); if(ci>=0){ t.cols.splice(ci,1); (t.meta||[]).splice(ci,1); t.rows.forEach(r=>r.splice(ci,1)); } }
+  touch(); render(); toast(on?'해금 열 두 개를 맨 뒤에 붙였어요':'해금 열을 뺐어요',true); }
+const ulItem=(src,id,name,a,b)=>{ const full=String(a||'').trim()||'Default', demoRaw=String(b||'').trim(); return {src,id,name,full,demoRaw,demo:demoRaw||full}; };
+function unlockItems(){ const out=[];
+  for(const t of db.tables){ if(!t.unlock)continue; const lc=t.cols.map(c=>String(c).trim().toLowerCase()); let ii=lc.indexOf('id'); if(ii<0)ii=0; let ni=lc.indexOf('name'); if(ni<0)ni=lc.indexOf('codename');
+    const a=t.cols.findIndex(c=>String(c).trim()==='UnlockType'), b=t.cols.findIndex(c=>String(c).trim()==='DemoUnlockType');
+    for(const r of t.rows){ const id=String(r[ii]??'').trim(); if(id)out.push(ulItem(t.name||'이름 없는 표',id,ni>=0?String(r[ni]??''):'',r[a],r[b])); } }
+  for(const [k,l] of NKL()) if((db.nunlock||{})[k]) for(const n of db.npcs) if((n.kind||'normal')===k) out.push(ulItem(l,String(n.num||'').trim()||n.id,n.name||n.id,(n.ul||{}).UnlockType,(n.ul||{}).DemoUnlockType));
+  return out; }
+const ulTargets=()=>unlockItems().filter(it=>it.full==='Story'||it.demo==='Story');
+const cmdId=l=>{ const m=String(l.cmd||'').match(/^Unlock:(.+)$/); return m?m[1].trim():null; };
+function cmdSel(l){ // 대사 한 줄에 다는 해금 명령 (Unlock:ID)
+  const opts=[['','명령 없음'],...ulTargets().map(it=>['Unlock:'+it.id,'해금 · ['+it.src+'] '+(it.name?it.name+' ':'')+'('+it.id+')'+(it.full!=='Story'?' · 데모에서만 Story':it.demo!=='Story'?' · 정식판에서만 Story':'')])];
+  const e=sel(opts,l.cmd||'',v=>{ if(v)l.cmd=v; else delete l.cmd; },'max-width:440px'); if(l.cmd)e.classList.add('cmdset'); return e; }
+function unlockReport(){
+  const items=unlockItems(), used={}, byId={}, R={full:[],demo:[],bad:[],info:[]};
+  for(const l of db.lines){ const id=cmdId(l); if(id)(used[id]=used[id]||[]).push(l); }
+  for(const it of items)(byId[it.id]=byId[it.id]||[]).push(it);
+  for(const it of items){ if(it.full==='Story'&&!used[it.id])R.full.push(it); if(it.demo==='Story'&&!used[it.id])R.demo.push(it); }
+  for(const id in used){ const its=byId[id], ls=used[id];
+    if(!its){ R.bad.push({id,ls,msg:'해금 열이 있는 표에 없는 ID예요'}); continue; }
+    if(its.length>1)R.bad.push({id,ls,msg:'같은 ID가 여러 곳에 있어요: '+its.map(x=>x.src).join(', ')});
+    const it=its[0];
+    if(it.full!=='Story'&&it.demo!=='Story')R.bad.push({id,ls,msg:'['+it.src+'] '+(it.name||'')+'은(는) 정식판·데모판 모두 Story가 아니에요'});
+    if(it.demo==='Locked')R.info.push({id,ls,msg:'['+it.src+'] '+(it.name||'')+'은(는) 데모에서 Locked라 데모에서는 이 명령이 무시돼요'}); }
+  return R; }
+const ulCount=R=>R.full.length+R.demo.length+R.bad.length;
+function openLine(l){ ui.tool='dialog'; ui.date=l.d; ui.vnpc=l.npc; ui.line=Math.max(0,linesOf(l.d,l.npc).indexOf(l)); closeModal(); go('dialog'); }
+function unlockModal(){
+  const R=unlockReport(), lineLinks=ls=>ls.map(l=>h('button',{class:'sm',onclick:()=>openLine(l)},dcode(l.d)+' · '+l.npc+' · '+(l.order)+'번 줄'));
+  const itemRow=it=>h('div',{class:'iss'},h('span',{class:'tag'},it.src),h('span',{class:'grow'},(it.name||'')+' ('+it.id+')'),h('span',{class:'muted'},'정식 '+it.full+' · 데모 '+it.demo+(it.demoRaw?'':' (같음)')));
+  const sec=(title,kind,list,row)=>h('div',{class:'sec'},h('h4',{},title+' ('+list.length+')'),list.length?list.map(row):h('span',{class:'muted'},'없어요'));
+  modal('해금 검사',h('div',{},
+    sec('경고 · 정식판에서 Story인데 어떤 대사에서도 열지 않는 항목','full',R.full,itemRow),
+    sec('경고 · 데모판에서 Story인데 어떤 대사에서도 열지 않는 항목','demo',R.demo,itemRow),
+    sec('경고 · 확인이 필요한 Unlock 명령','bad',R.bad,x=>h('div',{class:'iss'},h('span',{class:'tag pk'},'Unlock:'+x.id),h('span',{class:'grow'},x.msg),lineLinks(x.ls))),
+    sec('정보 · 데모에서 Locked인 항목을 여는 명령 (데모에서는 무시)','info',R.info,x=>h('div',{class:'iss'},h('span',{class:'tag sky'},'Unlock:'+x.id),h('span',{class:'grow'},x.msg),lineLinks(x.ls))),
+    h('p',{class:'muted'},'데모판 기준은 DemoUnlockType이 있으면 그 값, 없으면 UnlockType이에요. 해금 열은 각 표 위쪽의 "해금 열" 체크로 켜고 끕니다.')));
+}
+function updateUlBadge(){ const b=$('#ulbtn'); if(!b||!db)return; const n=ulCount(unlockReport()); put(b,'해금 검사',n?h('span',{class:'badge'},n):null); }
+
 /* ---------- 데이터베이스 ---------- */
 const NK=[['normal','손님(NPC)'],['special','특별손님'],['band','밴드멤버'],['talk','대사만 있는 손님']];
 const NKL=()=>NK.map(([k,l])=>[k,((db.nlabel||{})[k]||'').trim()||l]);
@@ -416,6 +479,7 @@ function colModal(cur,save,del){
   name.focus(); name.select();
 }
 function typedCell(m,get,set){
+  if(m.unlock){ const v=String(get()??''), e=sel([['',m.empty],...m.options],v,set); if(m.unlock==='DemoUnlockType'&&v)e.classList.add('demoset','ul-'+v); return e; }
   if(m.type==='enum')return sel([['','—'],...(m.options||[])],String(get()??''),set);
   const e=h('input',{type:m.type==='number'?'number':'text',value:get()??''}); e.addEventListener('input',()=>{set(e.value);touch();}); return e;
 }
@@ -433,6 +497,7 @@ function importCSV(ti){
     if(ti!=null){ const t=db.tables[ti], old={}; t.cols.forEach((c,i)=>{ if((t.meta||[])[i])old[c]=t.meta[i]; }); t.cols=cols; t.rows=data; t.meta=cols.map(c=>old[c]||null); }
     else{ const j=cols.join(' '); db.tables.push({name:file.name.replace(/\.[^.]+$/,''),kind:isDateCols(cols)&&!db.tables.some(t=>t.kind==='date')?'date':'',cols,rows:data}); ui.dbTab='t'+(db.tables.length-1); }
     db.tables.forEach(t=>{ if(t.kind==='date'){fillOldDow(t);ensureDemoRows(t);} });
+    applyUnlockDefaults(db);
     touch(); render(); toast('CSV를 불러왔어요: '+data.length+'행 × '+cols.length+'열',true); });
 }
 function tableView(ti){
@@ -444,12 +509,13 @@ function tableView(ti){
   return h('div',{class:'panel'},
     h('div',{class:'row',style:'margin-bottom:8px'},h('label',{class:'f'},'표시 이름',inp(t,'name',{rerender:true,style:'width:170px',ph:'표 이름'})),h('label',{class:'f'},'내보내기 파일 이름',h('span',{},inp(t,'file',{style:'width:170px',ph:fclean(t.name)||'table'}),' .csv')),
       h('label',{},'용도 ',sel([['','일반 표'],['date','날짜 데이터 (달력 · 좌표 툴에 표시)']],t.kind||'',v=>{ if(v==='date')db.tables.forEach(x=>{if(x.kind==='date')x.kind='';}); t.kind=v; })),
+      t.kind==='date'?null:h('label',{title:'UnlockType · DemoUnlockType 열을 맨 뒤에 붙여요'},h('input',{type:'checkbox',checked:!!t.unlock,onchange:e=>setTableUnlock(t,e.target.checked)}),' 해금 열'),
       h('span',{class:'muted grow'},t.rows.length+'행 × '+t.cols.length+'열'),
       h('button',{class:'sm',onclick:()=>importCSV(ti)},'CSV 다시 불러오기'),
       h('button',{class:'sm',onclick:()=>saveFile((t.name||'table')+'.csv','﻿'+toCSV([t.cols,...t.rows]))},'CSV 내보내기'),
       h('button',{class:'sm pk',onclick:()=>{snap();db.tables.splice(ti,1);ui.dbTab='normal';touch();render();toast('표를 삭제했어요',true);}},'표 삭제')),
     h('div',{class:'gridwrap','data-sc':'tbl'},h('table',{class:'grid'},
-      h('tr',{},h('th',{},'#'),t.cols.map((c,ci)=>h('th',{},h('div',{style:'display:flex;align-items:center'},colIn(ci),(t.meta[ci]||{}).type==='enum'?h('span',{class:'tag sky'},'목록'):null,h('button',{class:'sm ghost',title:'열 설정 (이름 · 값 종류 · 선택 목록)',onclick:()=>colModal(Object.assign({name:t.cols[ci]},t.meta[ci]||{}),o=>{t.cols[ci]=o.name;t.meta[ci]={type:o.type,options:o.options};},()=>delCol(ci))},'⚙'),h('button',{class:'sm ghost',title:'열 삭제',onclick:()=>{snap();delCol(ci);touch();render();toast('열을 삭제했어요',true);}},'✕')))),h('th',{},'')),
+      h('tr',{},h('th',{},'#'),t.cols.map((c,ci)=>(t.meta[ci]||{}).unlock?h('th',{class:'ulth',style:'padding:4px 8px'},c,h('span',{class:'tag sky',style:'margin-left:4px'},'해금')):h('th',{},h('div',{style:'display:flex;align-items:center'},colIn(ci),(t.meta[ci]||{}).type==='enum'?h('span',{class:'tag sky'},'목록'):null,h('button',{class:'sm ghost',title:'열 설정 (이름 · 값 종류 · 선택 목록)',onclick:()=>colModal(Object.assign({name:t.cols[ci]},t.meta[ci]||{}),o=>{t.cols[ci]=o.name;t.meta[ci]={type:o.type,options:o.options};},()=>delCol(ci))},'⚙'),h('button',{class:'sm ghost',title:'열 삭제',onclick:()=>{snap();delCol(ci);touch();render();toast('열을 삭제했어요',true);}},'✕')))),h('th',{},'')),
       t.rows.map((r,ri)=>h('tr',{},h('td',{class:'muted',style:'padding:0 6px'},ri+1),t.cols.map((c,ci)=>h('td',{},cell(r,ci))),
         h('td',{},h('button',{class:'sm ghost',title:'행 삭제',onclick:()=>{snap();t.rows.splice(ri,1);touch();render();toast('행을 삭제했어요',true);}},'✕')))))),
     h('div',{class:'row',style:'margin-top:8px'},h('button',{class:'pri sm',onclick:()=>{t.rows.push(t.cols.map(()=>''));touch();render();}},'+ 행 추가'),
@@ -487,15 +553,18 @@ function dbView(){
   const xc=db.ncols[ui.dbTab]||(db.ncols[ui.dbTab]=[]);
   const addCol=()=>{const c={key:'c'+(db.nseq++),name:'새 열',type:'text',options:[]};xc.push(c);touch();render();colModal(c,o=>Object.assign(c,o),()=>xc.splice(xc.indexOf(c),1));};
   const pre={normal:'npc',special:'special',band:'band',talk:'talk'}[ui.dbTab];
-  db.nlabel=db.nlabel||{}; db.nfile=db.nfile||{};
+  db.nlabel=db.nlabel||{}; db.nfile=db.nfile||{}; db.nunlock=db.nunlock||{}; const ulOn=!!db.nunlock[ui.dbTab];
   return h('div',{},tabs,
     h('div',{class:'panel'},
-      h('div',{class:'row',style:'margin-bottom:10px'},h('label',{class:'f'},'표시 이름',inp(db.nlabel,ui.dbTab,{rerender:true,style:'width:170px',ph:NK.find(k=>k[0]===ui.dbTab)[1]})),h('label',{class:'f'},'내보내기 파일 이름',h('span',{},inp(db.nfile,ui.dbTab,{style:'width:200px',ph:NFILE[ui.dbTab]}),' .csv'))),
-      h('div',{style:'overflow:auto'},h('table',{style:'min-width:'+(820+xc.length*130)+'px'},h('tr',{},NCOLS.map(c=>h('th',{},c[1])),
+      h('div',{class:'row',style:'margin-bottom:10px'},h('label',{class:'f'},'표시 이름',inp(db.nlabel,ui.dbTab,{rerender:true,style:'width:170px',ph:NK.find(k=>k[0]===ui.dbTab)[1]})),h('label',{class:'f'},'내보내기 파일 이름',h('span',{},inp(db.nfile,ui.dbTab,{style:'width:200px',ph:NFILE[ui.dbTab]}),' .csv')),
+        h('label',{title:'UnlockType · DemoUnlockType 열을 맨 뒤에 붙여요 (값은 꺼도 지워지지 않아요)',style:'align-self:flex-end'},h('input',{type:'checkbox',checked:ulOn,onchange:e=>{db.nunlock[ui.dbTab]=e.target.checked;touch();render();}}),' 해금 열')),
+      h('div',{style:'overflow:auto'},h('table',{style:'min-width:'+(820+xc.length*130+(ulOn?380:0))+'px'},h('tr',{},NCOLS.map(c=>h('th',{},c[1])),
           xc.map(c=>h('th',{},c.name,c.type==='enum'?h('span',{class:'tag sky',style:'margin-left:4px'},'목록'):null,c.fixed?null:h('button',{class:'sm ghost',title:'열 설정 (이름 · 값 종류 · 선택 목록 · 삭제)',onclick:()=>colModal(c,o=>Object.assign(c,o),()=>xc.splice(xc.indexOf(c),1))},'⚙'))),
+          ulOn?UL.map(u=>h('th',{class:'ulth'},u.name,h('span',{class:'tag sky',style:'margin-left:4px'},'해금'))):null,
           h('th',{style:'width:150px'},'분류'),h('th',{style:'width:40px'},'')),
         rows.map(r=>h('tr',{},NCOLS.map(c=>h('td',{style:c[0]==='id'&&dup.has(r.id)?'background:var(--pinkl)':''},inp(r,c[0],{type:c[2]||'text',rerender:c[0]==='id'}))),
           xc.map(c=>h('td',{},typedCell(c,()=>(r.x||{})[c.key],v=>{(r.x||(r.x={}))[c.key]=v;}))),
+          ulOn?UL.map(u=>h('td',{},typedCell(ulMeta(u),()=>(r.ul||{})[u.name],v=>{(r.ul||(r.ul={}))[u.name]=v;}))):null,
           h('td',{},sel(NKL(),kindOf(r),v=>r.kind=v)),
           h('td',{},h('button',{class:'sm ghost',title:'삭제',onclick:()=>{snap();db.npcs.splice(db.npcs.indexOf(r),1);touch();render();toast('삭제했어요',true);}},'✕')))))),
       rows.length?null:h('p',{class:'muted'},'아직 없어요.'),
@@ -732,6 +801,7 @@ function editCol(){
           sel(evTypes().map(e=>[e.id,e.name]),l.type,v=>{l.type=v;ui.line=i;}),
           h('span',{class:'muted'},'대상'),sel(spOpts,l.speaker,v=>{l.speaker=v;ui.line=i;}),
           arg,ev.param==='tile'?h('button',{class:'sm',onclick:()=>{ui.line=i;pickTile(v=>{l.arg=v;});}},'맵에서 고르기'):null,
+          h('span',{class:'tag'+(l.cmd?' sky':'')},'명령'),cmdSel(l),
           h('span',{class:'grow'}),
           h('button',{class:'sm',onclick:()=>mvE(-1)},'↑'),h('button',{class:'sm',onclick:()=>mvE(1)},'↓'),
           h('button',{class:'sm',onclick:()=>{snap();db.lines.splice(db.lines.indexOf(l),1);renum(linesOf(ui.date,who));ui.line=Math.max(0,i-1);touch();render();toast('연출을 삭제했어요',true);}},'✕'))); }
@@ -749,7 +819,7 @@ function editCol(){
         h('span',{class:'grow'}),
         h('button',{class:'sm',onclick:()=>mv(-1)},'↑'),h('button',{class:'sm',onclick:()=>mv(1)},'↓'),
         h('button',{class:'sm',onclick:()=>{snap();db.lines.splice(db.lines.indexOf(l),1);renum(linesOf(ui.date,who));ui.line=Math.max(0,i-1);touch();render();toast('줄을 삭제했어요',true);}},'✕')),
-      ta,warn);
+      ta,h('div',{class:'row',style:'margin-top:6px'},h('span',{class:'tag'+(l.cmd?' sky':'')},'명령'),cmdSel(l)),warn);
   });
   return h('div',{'data-sc':'edit'},
     h('div',{class:'panel'},h('div',{class:'row'},h('h3',{},npcLabel(who)),h('span',{class:'muted grow'},dlw(ui.date)+' · 대사 '+L.length+'줄 · 대사와 연출이 위에서부터 순서대로 재생돼요'))),
@@ -762,11 +832,11 @@ const sortedVisits=()=>[...db.visits].sort((a,b)=>dord(a.d)-dord(b.d)||byOrder(a
 const sortedLines=()=>{ const vo={}; db.visits.forEach(v=>vo[v.d+'|'+v.npc]=+v.order||0); return [...db.lines].sort((a,b)=>dord(a.d)-dord(b.d)||((vo[a.d+'|'+a.npc]||999)-(vo[b.d+'|'+b.npc]||999))||(a.npc<b.npc?-1:a.npc>b.npc?1:0)||byOrder(a,b)); };
 const NL=s=>String(s??'').replace(/\r?\n/g,'\\n'); // CSV 한 줄 = 대사 한 줄이 되도록 줄바꿈은 \n 글자로 내보낸다
 const visitsCSV=()=>toCSV([['날짜ID','NPC ID','방문 순서'],...sortedVisits().map(v=>[dcode(v.d),v.npc,v.order])]);
-const linesCSV=()=>toCSV([['날짜ID','NPC ID','순서','화자 ID','표정','대사 텍스트','종류','연출 값'],...sortedLines().map(l=>[dcode(l.d),l.npc,l.order,l.speaker,isEv(l)||l.speaker==='player'?'':(l.face||''),isEv(l)?'':NL(l.text),isEv(l)?l.type:'Talk',isEv(l)?(l.arg??''):''])]);
+const linesCSV=()=>toCSV([['날짜ID','NPC ID','순서','화자 ID','표정','대사 텍스트','종류','연출 값','Command'],...sortedLines().map(l=>[dcode(l.d),l.npc,l.order,l.speaker,isEv(l)||l.speaker==='player'?'':(l.face||''),isEv(l)?'':NL(l.text),isEv(l)?l.type:'Talk',isEv(l)?(l.arg??''):'',l.cmd||''])]);
 function importTalkCSV(which){
   pickFile('.csv,text/csv','csv',text=>{ const rows=csvParse(text).filter(r=>r.some(c=>String(c).trim()!=='')).slice(1); let bad=0; const out=[];
     for(const r of rows){ const d=dkeyOf(r[0]); if(!d||!String(r[1]||'').trim()){bad++;continue;}
-      out.push(which==='visits'?{d,npc:String(r[1]).trim(),order:+r[2]||out.length+1}:{d,npc:String(r[1]).trim(),order:+r[2]||out.length+1,speaker:String(r[3]||r[1]).trim(),face:String(r[4]||'').trim(),text:String(r[5]??'').replace(/\\n/g,'\n'),type:String(r[6]||'').trim()==='Talk'?'':String(r[6]||'').trim(),arg:String(r[7]??'').trim()}); }
+      out.push(which==='visits'?{d,npc:String(r[1]).trim(),order:+r[2]||out.length+1}:{d,npc:String(r[1]).trim(),order:+r[2]||out.length+1,speaker:String(r[3]||r[1]).trim(),face:String(r[4]||'').trim(),text:String(r[5]??'').replace(/\\n/g,'\n'),type:String(r[6]||'').trim()==='Talk'?'':String(r[6]||'').trim(),arg:String(r[7]??'').trim(),...(String(r[8]??'').trim()?{cmd:String(r[8]).trim()}:{})}); }
     snap(); db[which]=out; touch(); render(); toast(out.length+'행을 불러왔어요'+(bad?' · 날짜ID를 못 찾아 건너뛴 줄 '+bad+'개':''),true); });
 }
 function talkTable(which){
@@ -775,7 +845,7 @@ function talkTable(which){
   const del=r=>h('button',{class:'sm ghost',title:'행 삭제',onclick:()=>{snap();db[which].splice(db[which].indexOf(r),1);touch();render();toast('행을 삭제했어요',true);}},'✕');
   const num=r=>{const e=h('input',{type:'number',value:r.order,style:'min-width:60px'});e.addEventListener('input',()=>{r.order=e.value===''?'':+e.value;touch();});e.addEventListener('change',render);return e;};
   const txt=r=>{const e=h('input',{type:'text',value:r.text,style:'min-width:360px'});e.addEventListener('input',()=>{r.text=e.value;touch();});return e;};
-  const head=isV?['날짜ID','NPC ID','방문 순서']:['날짜ID','NPC ID','순서','화자 ID','표정','대사 텍스트','종류','연출 값'];
+  const head=isV?['날짜ID','NPC ID','방문 순서']:['날짜ID','NPC ID','순서','화자 ID','표정','대사 텍스트','종류','연출 값','Command'];
   const argIn=r=>{const e=h('input',{type:'text',value:r.arg??'',style:'min-width:110px'});e.addEventListener('input',()=>{r.arg=e.value;touch();});return e;};
   return h('div',{class:'panel'},
     h('div',{class:'row',style:'margin-bottom:8px'},h('h3',{},isV?'날짜별 방문자':'대사'),
@@ -784,7 +854,7 @@ function talkTable(which){
       h('button',{class:'sm',onclick:()=>saveFile(exportFiles()[isV?'date':'dlg'].find(f=>f.key===which).file+'.csv','﻿'+(isV?visitsCSV():linesCSV()))},'CSV 내보내기')),
     h('div',{class:'gridwrap','data-sc':'tbl'},h('table',{class:'grid'},h('tr',{},head.map(x=>h('th',{style:'padding:4px 8px'},x)),h('th',{},'')),
       rows.map(r=>h('tr',{},h('td',{},sel(dateOpts,r.d,v=>r.d=v)),h('td',{},sel(npcIds,r.npc,v=>r.npc=v)),h('td',{},num(r)),
-        isV?null:[h('td',{},sel(spIds,r.speaker,v=>{r.speaker=v;if(!facesOf(v).includes(r.face))r.face=facesOf(v)[0]||'';})),h('td',{},r.speaker==='player'?'':sel(facesOf(r.speaker),r.face,v=>r.face=v)),h('td',{},txt(r)),h('td',{},sel([['','Talk'],...evTypes().map(e=>[e.id,e.id])],isEv(r)?r.type:'',v=>r.type=v)),h('td',{},isEv(r)?argIn(r):'')],
+        isV?null:[h('td',{},sel(spIds,r.speaker,v=>{r.speaker=v;if(!facesOf(v).includes(r.face))r.face=facesOf(v)[0]||'';})),h('td',{},r.speaker==='player'?'':sel(facesOf(r.speaker),r.face,v=>r.face=v)),h('td',{},txt(r)),h('td',{},sel([['','Talk'],...evTypes().map(e=>[e.id,e.id])],isEv(r)?r.type:'',v=>r.type=v)),h('td',{},isEv(r)?argIn(r):''),h('td',{},cmdSel(r))],
         h('td',{},del(r)))))),
     h('div',{class:'row',style:'margin-top:8px'},h('button',{class:'pri sm',onclick:()=>{ const d=ui.date||ALLDATES[0], npc=npcIds[0]||''; if(!npc){toast('NPC를 먼저 추가해 주세요');return;}
         if(isV)db.visits.push({d,npc,order:visitsOf(d).length+1}); else db.lines.push({d,npc,order:linesOf(d,npc).length+1,speaker:isGen(npc)?GEN:npc,face:facesOf(npc)[0]||'',text:''}); touch();render(); }},'+ 행 추가'),
@@ -927,7 +997,7 @@ function unityExport(){
   return {npcs:db.npcs.map(n=>({id:n.id,unityId:n.num||'',name:n.name,category:n.kind||'normal',portraits:facesOf(n.id),extra:((db.ncols||{})[n.kind||'normal']||[]).map(c=>({name:c.name,value:String((n.x||{})[c.key]??'')}))})),
     tables:db.tables.map(t=>({name:t.name,kind:t.kind||'',columns:t.cols,rows:t.rows.map(r=>({cells:r.map(c=>String(c??''))}))})),
     visitors:sortedVisits().map(v=>({dateId:dcode(v.d),npcId:v.npc,order:+v.order||0})),
-    dialogues:sortedLines().map(l=>({dateId:dcode(l.d),npcId:l.npc,order:+l.order||0,type:isEv(l)?l.type:'Talk',arg:isEv(l)?String(l.arg??''):'',speakerId:l.speaker,portrait:l.speaker==='player'?'':(l.face||''),text:isEv(l)?'':(l.text||'')})),
+    dialogues:sortedLines().map(l=>({dateId:dcode(l.d),npcId:l.npc,order:+l.order||0,type:isEv(l)?l.type:'Talk',arg:isEv(l)?String(l.arg??''):'',speakerId:l.speaker,portrait:l.speaker==='player'?'':(l.face||''),text:isEv(l)?'':(l.text||''),command:l.cmd||''})),
     npcSpawns:Object.keys(db.coord.daily).flatMap(k=>Object.keys(db.coord.daily[k]).flatMap(sid=>Object.keys(db.coord.daily[k][sid]).map(c=>{const o=db.coord.daily[k][sid][c],p=kxy(c);return Object.assign(date(k),{slot:sid,npcId:o.npc||'',name:cname(o),x:p.x,y:p.y});}))),
     fixedNpcs:Object.keys(db.coord.fixed).map(c=>{const f=db.coord.fixed[c],p=kxy(c);return {npcId:f.npc||'',name:cname(f),x:p.x,y:p.y,slots:f.slots||SLOTS.map(x=>x[0]),exceptDates:(f.except||[]).map(date)};})};
 }
@@ -953,7 +1023,7 @@ function zipStore(files){ // 무압축 ZIP (UTF-8 파일명)
 const NFILE={normal:'DataNpcCustomer',special:'DataNpcCustomerSpecial',band:'DataNpcBandMember',talk:'DataNpc'};
 const XFILE={spawn:'NpcSpawnByDate',fixed:'NpcSpawnFixed',visits:'DateVisitor',lines:'Dialogue'};
 const fclean=n=>String(n||'').replace(/\.csv$/i,'').replace(/[\\/:*?"<>|]+/g,'_').trim();
-function npcCSV(kind){ const xc=db.ncols[kind]||[]; return toCSV([['ID','CodeName','Name',...xc.map(c=>c.name),'Portraits'],...db.npcs.filter(n=>(n.kind||'normal')===kind).map(n=>[n.num||'',n.id,n.name,...xc.map(c=>(n.x||{})[c.key]??''),facesOf(n.id).join('|')])]); }
+function npcCSV(kind){ const xc=db.ncols[kind]||[], on=!!(db.nunlock||{})[kind]; return toCSV([['ID','CodeName','Name',...xc.map(c=>c.name),'Portraits',...(on?UL.map(u=>u.name):[])],...db.npcs.filter(n=>(n.kind||'normal')===kind).map(n=>[n.num||'',n.id,n.name,...xc.map(c=>(n.x||{})[c.key]??''),facesOf(n.id).join('|'),...(on?UL.map(u=>(n.ul||{})[u.name]||''):[])])]); }
 function spawnCSV(){ const S=db.coord, R=[['월','일','요일','DateID','시간대','NpcID','CodeName','Name','X','Y']], code=o=>o.npc&&npcOf(o.npc)?(npcOf(o.npc).num||''):'';
   for(const k of Object.keys(S.daily).sort((a,b)=>ALLDATES.indexOf(a)-ALLDATES.indexOf(b)))for(const [sid,sn] of SLOTS)for(const c in (S.daily[k][sid]||{})){ const o=S.daily[k][sid][c],p=kxy(c),[m,d]=k.split('-'); R.push([m,d,dowOf(k)>=0?DOW[dowOf(k)]:'',(DM[k]||{}).id||'',sn,code(o),o.npc||'',cname(o),p.x,p.y]); }
   return toCSV(R); }
