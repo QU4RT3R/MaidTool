@@ -203,9 +203,11 @@ const TEXTCOLNAME=['기본','파랑','분홍','초록','하늘','보라','노랑
 const MOODS=['','좋음','보통','나쁨'];
 const STATUS={draft:'초안',review:'검수 필요',final:'확정'};
 const FX={affinity:'호감도',item:'아이템 해금',recipe:'레시피 해금'};
-const MONTHS=[[6,30],[7,31],[8,31]], SPECIAL=['4-5','4-14'];
-const ALLDATES=[...SPECIAL,...MONTHS.flatMap(([m,n])=>Array.from({length:n},(_,i)=>m+'-'+(i+1)))];
-const dl=k=>{const [m,d]=k.split('-');return m+'월 '+d+'일';};
+const MONTHS=[[6,30],[7,31],[8,31]], SPECIAL=['4-5','4-14'], DEMO=['0-1','0-2']; // 데모 n일차는 월 0으로 둔다
+const isDemo=k=>DEMO.includes(k);
+const ALLDATES=[...SPECIAL,...MONTHS.flatMap(([m,n])=>Array.from({length:n},(_,i)=>m+'-'+(i+1))),...DEMO];
+const SEQDATES=ALLDATES.filter(k=>!SPECIAL.includes(k)&&!isDemo(k)); // 요일이 이어지는 6~8월
+const dl=k=>{const [m,d]=k.split('-');return m==='0'?'데모 '+d+'일차':m+'월 '+d+'일';};
 const LS='merongtool.autosave', LSF='merongtool.font';
 let FONT='"Galmuri9","Galmuri11","DungGeunMo","NeoDunggeunmo","Neo둥근모","DOSGothic","Malgun Gothic",sans-serif'; // 미리보기(게임 화면) 전용 폰트
 
@@ -240,7 +242,7 @@ function normalize(d){ // 오래된 세이브·빠진 필드 보정
   for(const [k,nm,kind] of [['items','아이템','item'],['recipes','레시피','recipe']]){ if(Array.isArray(d[k])&&d[k].length)d.tables.push({name:nm,kind,cols:['ID','Name','설명'],rows:d[k].map(r=>[r.id,r.name||'',r.desc||''])}); delete d[k]; }
   for(const t of d.tables){ if(!t.kind&&isDateCols(t.cols)&&!d.tables.some(x=>x.kind==='date'))t.kind='date'; }
   if(!d.tables.some(t=>t.kind==='date'))d.tables.unshift(defaultDateTable());
-  fillOldDow(d.tables.find(x=>x.kind==='date'));
+  fillOldDow(d.tables.find(x=>x.kind==='date')); ensureDemoRows(d.tables.find(x=>x.kind==='date'));
   ensureNpcCols(d);
   delete d.vars; delete d.flags; for(const n of d.npcs)n.kind=n.kind||'normal';
   d.preview=d.preview&&d.preview.v===2?Object.assign(b.preview,d.preview):b.preview; delete d.coords; delete d.map; d.coord=Object.assign(b.coord,d.coord);
@@ -337,12 +339,17 @@ function dateSets(){ const s=new Set(); for(const v of db.visits)s.add(v.d); for
 const DOW='일월화수목금토';
 const DATECOLS=['ID','CodeName','Name','월','일','요일','가게영업여부','진행이벤트','오늘의 일반 손님 예정','예정 특별손님ID 1','예정 특별손님ID 2','예정 특별손님ID 3','예정 특별손님ID 4','메모'];
 function defaultDateTable(){ // 팀 캘린더 CSV와 같은 구성. 6월 1일 = 금요일, 4월 5일 = 수, 4월 14일 = 금
-  const MN={4:'April',6:'June',7:'July',8:'August'}, seq=ALLDATES.filter(k=>!SPECIAL.includes(k));
-  const rows=ALLDATES.map(k=>{ const [m,d]=k.split('-').map(Number), old=SPECIAL.includes(k), w=old?(k==='4-5'?'수':'금'):DOW[(5+seq.indexOf(k))%7];
+  const MN={0:'Demo',4:'April',6:'June',7:'July',8:'August'}, seq=SEQDATES;
+  const rows=ALLDATES.filter(k=>!isDemo(k)).map(k=>{ const [m,d]=k.split('-').map(Number), old=SPECIAL.includes(k), w=old?(k==='4-5'?'수':'금'):DOW[(5+seq.indexOf(k))%7];
     return ['21'+String(m).padStart(2,'0')+String(d).padStart(2,'0'),MN[m]+d,m+'월 '+d+'일',String(m),String(d),w,old?'-1':'1','',old?'0':'','','','','',old?'작년':(k==='6-1'?'여기부터 올해':'')]; });
   const meta=DATECOLS.map(c=>c==='요일'?{type:'enum',options:[...DOW]}:null);
-  return {name:'날짜',file:'DateDataTable',kind:'date',cols:[...DATECOLS],rows,meta};
+  const t={name:'날짜',file:'DateDataTable',kind:'date',cols:[...DATECOLS],rows,meta}; ensureDemoRows(t); return t;
 }
+function ensureDemoRows(t){ // 날짜 표에 데모 1·2일차 줄이 없으면 맨 아래에 붙인다
+  if(!t)return; const cs=t.cols.map(c=>String(c).replace(/\s/g,'')), cm=cs.indexOf('월'), cd=cs.indexOf('일'); if(cm<0||cd<0)return;
+  for(const k of DEMO){ const [m,d]=k.split('-'); if(t.rows.some(r=>String(r[cm]).trim()===m&&+r[cd]===+d))continue;
+    const val={'id':'2100'+String(d).padStart(2,'0'),'codename':'Demo'+d,'name':'데모 '+d+'일차','월':m,'일':d,'가게영업여부':'1','메모':'데모'};
+    t.rows.push(t.cols.map(c=>{const n=String(c).replace(/\s/g,''); return val[n.toLowerCase()]??val[n]??'';})); } }
 function fillOldDow(t){ if(!t)return; const cs=t.cols.map(c=>String(c).replace(/\s/g,'')), cm=cs.indexOf('월'), cd=cs.indexOf('일'), cw=cs.indexOf('요일'); // 작년 두 날짜의 빈 요일 채우기
   if(cm>=0&&cd>=0&&cw>=0)for(const r of t.rows){ const k=(+r[cm])+'-'+(+r[cd]); if(!String(r[cw]||'').trim()){ if(k==='4-5')r[cw]='수'; if(k==='4-14')r[cw]='금'; } } }
 const isDateCols=cols=>{const c=cols.map(x=>String(x).replace(/\s/g,''));return c.includes('월')&&c.includes('일')&&c.includes('요일');};
@@ -353,8 +360,8 @@ function dateMap(){
   const ci=cs.findIndex(c=>c.toLowerCase()==='id'),cm=ix('월'),cd=ix('일'),cw=ix('요일'),co=find('가게영업'),ce=find('이벤트'),cg=find('일반손님'),cn=find('메모'),sp=cs.map((c,i)=>c.includes('특별손님')?i:-1).filter(i=>i>=0);
   if(cm<0||cd<0)return m;
   const g=(r,i)=>i>=0?String(r[i]??'').trim():'';
-  for(const r of t.rows){ if(!(+r[cm]&&+r[cd]))continue; m[(+r[cm])+'-'+(+r[cd])]={id:g(r,ci),code:g(r,cs.findIndex(c=>c.toLowerCase()==='codename')),dow:g(r,cw)?DOW.indexOf(g(r,cw).charAt(0)):-1,closed:g(r,co)==='-1'||g(r,co)==='0',event:g(r,ce),guests:g(r,cg),memo:g(r,cn),special:sp.map(i=>g(r,i)).filter(v=>v&&v!=='-1')}; }
-  const seq=ALLDATES.filter(k=>!SPECIAL.includes(k)), base=seq.findIndex(k=>m[k]&&m[k].dow>=0); // 6~8월은 이어진 날짜라 빈 요일을 채워 준다
+  for(const r of t.rows){ if(String(r[cm]??'').trim()===''||isNaN(+r[cm])||!(+r[cd]))continue; m[(+r[cm])+'-'+(+r[cd])]={id:g(r,ci),code:g(r,cs.findIndex(c=>c.toLowerCase()==='codename')),dow:g(r,cw)?DOW.indexOf(g(r,cw).charAt(0)):-1,closed:g(r,co)==='-1'||g(r,co)==='0',event:g(r,ce),guests:g(r,cg),memo:g(r,cn),special:sp.map(i=>g(r,i)).filter(v=>v&&v!=='-1')}; }
+  const seq=SEQDATES, base=seq.findIndex(k=>m[k]&&m[k].dow>=0); // 6~8월은 이어진 날짜라 빈 요일을 채워 준다
   if(base>=0)seq.forEach((k,i)=>{ if(!m[k])m[k]={dow:-1,special:[]}; if(m[k].dow<0)m[k].dow=(((m[seq[base]].dow+i-base)%7)+7)%7; });
   return m;
 }
@@ -379,6 +386,7 @@ function renderCal(){
     MONTHS.map(([m,n])=>{ const first=dowOf(m+'-1');
       return [h('h4',{},m+'월'),first>=0?h('div',{class:'days wk'},[...DOW].map((x,j)=>h('span',{class:j===0?'sun':j===6?'sat':''},x))):null,
         h('div',{class:'days'},Array.from({length:n},(_,i)=>day(m+'-'+(i+1),i+1,i===0&&first>=0?'grid-column-start:'+(first+1):null)))]; }),
+    h('h4',{},'데모'), h('div',{class:'days',style:'grid-template-columns:repeat(2,1fr)'},DEMO.map(k=>day(k,k.split('-')[1]+'일차'))),
     h('p',{class:'muted'},'초록 점: 방문자나 NPC 배치 있음 · 빗금: 휴무. 요일과 휴무는 데이터베이스의 날짜 표에서 가져와요.'));
 }
 
@@ -420,7 +428,7 @@ function importCSV(ti){
     snap();
     if(ti!=null){ const t=db.tables[ti], old={}; t.cols.forEach((c,i)=>{ if((t.meta||[])[i])old[c]=t.meta[i]; }); t.cols=cols; t.rows=data; t.meta=cols.map(c=>old[c]||null); }
     else{ const j=cols.join(' '); db.tables.push({name:file.name.replace(/\.[^.]+$/,''),kind:isDateCols(cols)&&!db.tables.some(t=>t.kind==='date')?'date':'',cols,rows:data}); ui.dbTab='t'+(db.tables.length-1); }
-    db.tables.forEach(t=>{ if(t.kind==='date')fillOldDow(t); });
+    db.tables.forEach(t=>{ if(t.kind==='date'){fillOldDow(t);ensureDemoRows(t);} });
     touch(); render(); toast('CSV를 불러왔어요: '+data.length+'행 × '+cols.length+'열',true); });
 }
 function tableView(ti){
@@ -624,7 +632,7 @@ function coordView(){
 }
 
 /* ---------- 대화 툴 (날짜 → 방문자 → 대사) ---------- */
-const MNAME={4:'April',6:'June',7:'July',8:'August'};
+const MNAME={0:'Demo',4:'April',6:'June',7:'July',8:'August'};
 const dcode=k=>(DM[k]&&DM[k].code)||(()=>{const [m,d]=String(k).split('-');return (MNAME[m]||('M'+m))+d;})(); // 날짜ID (April5, June1 …)
 const dkeyOf=code=>ALLDATES.find(k=>dcode(k)===String(code).trim())||'';
 const dord=k=>{const i=ALLDATES.indexOf(k);return i<0?9999:i;};
