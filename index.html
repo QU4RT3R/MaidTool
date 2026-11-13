@@ -73,6 +73,10 @@ main{flex:1;min-width:0;display:flex;flex-direction:column}
 .tabs button:last-of-type{border-radius:0 8px 8px 0;margin-right:10px}
 .tabs button.on{background:var(--sky);border-color:var(--sky);color:#fff;position:relative}
 .tabs button.on .muted{color:#fff}
+.tabs button[draggable=true]{cursor:grab}
+.tabs button.dragging{opacity:.4}
+.tabs button.dropL{box-shadow:inset 3px 0 0 var(--pink2)}
+.tabs button.dropR{box-shadow:inset -3px 0 0 var(--pink2)}
 .badge{background:var(--pink2);color:#fff;border-radius:8px;padding:0 6px;margin-left:5px;font-size:11px}
 
 .dlg{display:grid;grid-template-columns:270px minmax(340px,1fr) auto;gap:12px;height:100%}
@@ -452,12 +456,30 @@ function tableView(ti){
       h('button',{class:'sm',onclick:()=>{const ci=t.cols.length;t.cols.push('새 열');t.rows.forEach(r=>r.push(''));touch();render();colModal({name:'새 열'},o=>{t.cols[ci]=o.name;t.meta[ci]={type:o.type,options:o.options};},()=>delCol(ci));}},'+ 열 추가'),
       h('span',{class:'muted'},'CSV의 열과 값을 그대로 보관해요.')));
 }
+let dbDrag=null;
+function dbTabList(){ // 데이터베이스 탭 목록. 표는 위치(t0, t1…)가 바뀌어도 순서가 유지되도록 고유 키(u:…)로 기억한다
+  const items=[...NKL().map(([k,l])=>({k,l,n:db.npcs.filter(n=>(n.kind||'normal')===k).length,go:k})),
+    {k:'visits',l:'날짜별 방문자',n:db.visits.length,go:'visits'},{k:'lines',l:'대사',n:db.lines.length,go:'lines'},
+    ...db.tables.map((t,i)=>{ if(!t.uid)t.uid='T'+Date.now().toString(36)+i+Math.random().toString(36).slice(2,6); return {k:'u:'+t.uid,l:t.name||'이름 없는 표',n:t.rows.length,go:'t'+i}; })];
+  const ord=db.tabOrder||[], pos=it=>{const i=ord.indexOf(it.k);return i<0?1e6+items.indexOf(it):i;};
+  return items.map(it=>[pos(it),it]).sort((a,b)=>a[0]-b[0]).map(x=>x[1]);
+}
 function dbView(){
   const isT=()=>/^t\d+$/.test(ui.dbTab);
   if(!NK.some(k=>k[0]===ui.dbTab)&&ui.dbTab!=='visits'&&ui.dbTab!=='lines'&&!(isT()&&db.tables[+ui.dbTab.slice(1)]))ui.dbTab='normal';
   const kindOf=n=>n.kind||'normal';
-  const tab=(k,l,n)=>h('button',{class:ui.dbTab===k?'on':'',onclick:()=>{ui.dbTab=k;render();}},l,h('span',{class:'muted'},' '+n));
-  const tabs=h('div',{class:'row',style:'margin-bottom:10px'},h('div',{class:'tabs',style:'margin-bottom:0'},NKL().map(([k,l])=>tab(k,l,db.npcs.filter(n=>kindOf(n)===k).length)),tab('visits','날짜별 방문자',db.visits.length),tab('lines','대사',db.lines.length),db.tables.map((t,i)=>tab('t'+i,t.name||'이름 없는 표',t.rows.length))),
+  const list=dbTabList();
+  const side=(e,el)=>{const r=el.getBoundingClientRect();return e.clientX>r.left+r.width/2;};
+  const clear=()=>document.querySelectorAll('.tabs button').forEach(b=>b.classList.remove('dragging','dropL','dropR'));
+  const tab=it=>h('button',{class:ui.dbTab===it.go?'on':'',draggable:'true',title:'끌어서 순서를 바꿀 수 있어요',onclick:()=>{ui.dbTab=it.go;render();},
+      ondragstart:e=>{dbDrag=it.k;e.dataTransfer.effectAllowed='move';try{e.dataTransfer.setData('text/plain',it.k);}catch(x){}e.currentTarget.classList.add('dragging');},
+      ondragend:()=>{dbDrag=null;clear();},
+      ondragover:e=>{ if(!dbDrag||dbDrag===it.k)return; e.preventDefault(); e.dataTransfer.dropEffect='move'; const a=side(e,e.currentTarget); e.currentTarget.classList.toggle('dropR',a); e.currentTarget.classList.toggle('dropL',!a); },
+      ondragleave:e=>e.currentTarget.classList.remove('dropL','dropR'),
+      ondrop:e=>{ e.preventDefault(); if(!dbDrag||dbDrag===it.k)return; const keys=list.map(x=>x.k).filter(k=>k!==dbDrag); keys.splice(keys.indexOf(it.k)+(side(e,e.currentTarget)?1:0),0,dbDrag);
+        db.tabOrder=keys; dbDrag=null; touch(); render(); }},
+    it.l,h('span',{class:'muted'},' '+it.n));
+  const tabs=h('div',{class:'row',style:'margin-bottom:10px'},h('div',{class:'tabs',style:'margin-bottom:0'},list.map(tab)),
     h('button',{class:'pri',onclick:()=>importCSV()},'+ CSV 불러오기'));
   if(isT())return h('div',{},tabs,tableView(+ui.dbTab.slice(1)));
   if(ui.dbTab==='visits'||ui.dbTab==='lines')return h('div',{},tabs,talkTable(ui.dbTab));
