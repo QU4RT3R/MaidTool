@@ -306,6 +306,22 @@ function sel(opts,cur,on,style){ const list=opts.map(o=>Array.isArray(o)?o:[o,o]
   const e=h('select',{style},list.map(([v,l])=>h('option',{value:v},l))); e.value=cur??''; e.addEventListener('change',()=>{on(e.value);touch();render();}); return e; }
 function chk(o,k,label,after){ const c=h('input',{type:'checkbox',checked:!!o[k]}); c.addEventListener('change',()=>{o[k]=c.checked;touch();after&&after();}); return h('label',{},c,' ',label); }
 
+/* ---------- 세이브 저장 (파일 이름: YYMMDD_HHMM_작성자) ---------- */
+const AUTHORS=['SSACO','ME4ONG'], LSA='merongtool.author';
+const p2=n=>String(n).padStart(2,'0');
+const saveName=(who,t=new Date())=>p2(t.getFullYear()%100)+p2(t.getMonth()+1)+p2(t.getDate())+'_'+p2(t.getHours())+p2(t.getMinutes())+'_'+who+'.json';
+function saveModal(){
+  let last=''; try{ last=localStorage.getItem(LSA)||''; }catch(e){}
+  const btn=who=>{ const b=h('button',{class:who===last?'pri':'',style:'flex:1;padding:14px;font-size:16px',onclick:()=>{
+      try{ localStorage.setItem(LSA,who); }catch(e){}
+      const t=new Date(); db.lastSave={by:who,at:t.toISOString()}; touch(); closeModal(); clearInterval(saveModal.t);
+      saveFile(saveName(who,t),JSON.stringify(db,null,1)); }},who,h('div',{class:'muted',style:'font-size:12px;margin-top:4px;color:inherit;opacity:.8'},saveName(who)));
+    return b; };
+  const row=h('div',{class:'row',style:'gap:10px'},AUTHORS.map(btn));
+  modal('누가 저장하나요?',h('div',{},row,h('p',{class:'muted',style:'margin-top:10px'},'파일 이름은 저장하는 순간의 날짜·시각으로 정해져요. 형식: 연월일_시분_작성자 (예: 261116_0304_ME4ONG)'),
+    db.lastSave?h('p',{class:'muted'},'마지막 저장: '+db.lastSave.by+' · '+new Date(db.lastSave.at).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'})):null));
+  clearInterval(saveModal.t); saveModal.t=setInterval(()=>{ if($('#modal').style.display!=='flex'){clearInterval(saveModal.t);return;} put(row,AUTHORS.map(btn)); },15000); // 열어 둔 사이 분이 바뀌면 미리보기 갱신
+}
 /* ---------- 타이틀 ---------- */
 function showTitle(){
   let auto=null; try{auto=JSON.parse(localStorage.getItem(LS)||'null');}catch(e){}
@@ -340,7 +356,7 @@ function renderTop(){
     h('button',{title:'사이드바 열기/닫기',onclick:()=>$('#app').classList.toggle('closed')},'☰'),
     inp(db,'name',{ph:'프로젝트 이름',style:'width:180px'}),
     h('span',{class:'muted grow',id:'saved'},''),
-    h('button',{class:'pri',onclick:()=>saveFile((db.name||'merongtool')+'.json',JSON.stringify(db,null,1))},'세이브 저장'),
+    h('button',{class:'pri',onclick:saveModal},'세이브 저장'),
     h('button',{id:'ulbtn',onclick:unlockModal},'해금 검사'),
     h('button',{onclick:exportModal},'내보내기'),
     h('button',{class:'ghost',onclick:()=>{ put($('#top'),); showTitle(); }},'타이틀로'));
