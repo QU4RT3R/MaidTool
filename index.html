@@ -1091,7 +1091,7 @@ function talkTable(which){
       h('button',{class:'sm',onclick:()=>saveFile(exportFiles()[isV?'date':'dlg'].find(f=>f.key===which).file+'.csv','﻿'+(isV?visitsCSV():linesCSV()))},'CSV 내보내기')),
     h('div',{class:'gridwrap','data-sc':'tbl'},h('table',{class:'grid'},h('tr',{},head.map(x=>h('th',{style:'padding:4px 8px'},x)),h('th',{},'')),
       rows.map(r=>h('tr',{},h('td',{},sel(dateOpts,r.d,v=>r.d=v)),h('td',{},sel(npcIds,r.npc,v=>r.npc=v)),h('td',{},num(r)),
-        isV?null:[h('td',{},sel(spIds,r.speaker,v=>{r.speaker=v;if(!facesOf(v).includes(r.face))r.face=facesOf(v)[0]||'';})),h('td',{},r.speaker==='player'?'':sel(facesOf(r.speaker),r.face,v=>r.face=v)),h('td',{},txt(r)),h('td',{},sel([['','Talk'],...evTypes().map(e=>[e.id,e.id])],isEv(r)?r.type:'',v=>r.type=v)),h('td',{},isEv(r)?argIn(r):''),h('td',{},cmdSel(r)),h('td',{class:'muted',style:'padding:0 8px'},r.id)],
+        isV?null:[h('td',{},sel(spIds,r.speaker,v=>{r.speaker=v;if(!facesOf(v).includes(r.face))r.face=facesOf(v)[0]||'';})),h('td',{},r.speaker==='player'?'':sel(facesOf(r.speaker),r.face,v=>r.face=v)),h('td',{},txt(r)),h('td',{},sel([['','Talk'],...evTypes().map(e=>[e.id,e.id])],isEv(r)?r.type:'',v=>r.type=v)),h('td',{},isEv(r)?argIn(r):''),h('td',{},cmdSel(r)),h('td',{class:'muted',style:'padding:0 8px;white-space:nowrap'},talkCode(r))],
         h('td',{},del(r)))))),
     h('div',{class:'row',style:'margin-top:8px'},h('button',{class:'pri sm',onclick:()=>{ const d=ui.date||ALLDATES[0], npc=npcIds[0]||''; if(!npc){toast('NPC를 먼저 추가해 주세요');return;}
         if(isV)db.visits.push({d,npc,order:visitsOf(d).length+1}); else db.lines.push({d,npc,order:linesOf(d,npc).length+1,speaker:isGen(npc)?GEN:npc,face:facesOf(npc)[0]||'',text:''}); touch();render(); }},'+ 행 추가'),
