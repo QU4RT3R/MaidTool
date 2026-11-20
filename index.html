@@ -778,10 +778,12 @@ function coordView(){
 const LINE_ID0=240001, EVENT_ID0=230001;
 function ensureLineIds(d){ if(!d||!Array.isArray(d.lines))return; let m=LINE_ID0-1; for(const l of d.lines)if(+l.id>m)m=+l.id; const seen=new Set();
   for(const l of d.lines){ if(!(+l.id)||seen.has(+l.id))l.id=++m; else l.id=+l.id; seen.add(l.id); } }
-const PHASES=[['Prepare','영업 전'],['SongSelect','곡 선택'],['PreShow','영업 중'],['Closing','마감 후']];
+const PHASES=[['DayStart','하루 시작'],['CardSelect','카드 선택'],['SongSelect','곡 선택'],['Prepare','영업 준비'],['PreShow','공연 전 영업'],['Show1','1부 공연'],['InterMission','인터미션'],['Show2','2부 공연'],['Closing','영업 마감'],['Result','정산']]; // 유니티 GameFlowState 순서
+const MINUTE_PHASES=['PreShow','Show1','InterMission','Show2']; // 몇 분째를 정할 수 있는 단계 (나머지는 -1 = 시작하자마자)
+const hasMin=p=>MINUTE_PHASES.includes(p);
 const phaseName=p=>(PHASES.find(x=>x[0]===p)||[p,'⚠ '+p])[1];
 const phaseIdx=p=>{const i=PHASES.findIndex(x=>x[0]===p);return i<0?9:i;};
-const evMin=e=>e.phase==='PreShow'&&e.minute!==''&&e.minute!=null?+e.minute:-1;
+const evMin=e=>hasMin(e.phase)&&e.minute!==''&&e.minute!=null?+e.minute:-1;
 const evSort=(a,b)=>dord(a.d)-dord(b.d)||phaseIdx(a.phase)-phaseIdx(b.phase)||evMin(a)-evMin(b)||(+a.order||0)-(+b.order||0);
 const eventsOf=k=>db.events.filter(e=>e.d===k).sort(evSort);
 const isEvtGrp=id=>/^Event\d+$/.test(String(id)), evtNo=id=>+String(id).slice(5)||0;
@@ -825,10 +827,10 @@ function eventCol(k){
     h('p',{class:'muted'},'시간 순서(시간대 → 분 → 순서)로 보여요. 누르면 연결된 첫 대사로 이동해요. 이벤트 대화는 랜덤 손님에게 나눠주지 않아요.'));
 }
 function evFields(e){ // 이벤트 한 줄의 입력칸 (대화 툴 · 이벤트 표 공용)
-  const minute=h('input',{type:'number',value:evMin(e),disabled:e.phase!=='PreShow',style:'width:70px',title:e.phase==='PreShow'?'영업 중 몇 분째에 시작 (-1 = 시작하자마자)':'영업 중일 때만 입력해요'});
+  const minute=h('input',{type:'number',value:evMin(e),disabled:!hasMin(e.phase),style:'width:70px',title:hasMin(e.phase)?phaseName(e.phase)+' 시작 뒤 몇 분째 (-1 = 시작하자마자)':'공연 전 영업 · 1부 공연 · 인터미션 · 2부 공연일 때만 입력해요'});
   minute.addEventListener('input',()=>{ e.minute=minute.value===''?-1:Math.max(-1,Math.round(+minute.value)); touch(); }); minute.addEventListener('change',render);
   const order=h('input',{type:'number',value:e.order,min:1,style:'width:60px'}); order.addEventListener('input',()=>{ e.order=order.value===''?'':Math.max(1,Math.round(+order.value)); touch(); }); order.addEventListener('change',render);
-  return {phase:sel(PHASES,e.phase,v=>{ e.phase=v; if(v!=='PreShow')e.minute=-1; }),minute,order,talk:sel(talkOpts(e.d),String(e.talk??''),v=>e.talk=v,'max-width:320px')}; }
+  return {phase:sel(PHASES,e.phase,v=>{ e.phase=v; if(!hasMin(v))e.minute=-1; }),minute,order,talk:sel(talkOpts(e.d),String(e.talk??''),v=>e.talk=v,'max-width:320px')}; }
 function evEditPanel(who){
   const evs=db.events.filter(e=>{const l=lineById(e.talk);return l&&l.d===ui.date&&l.npc===who;}).sort(evSort);
   return h('div',{class:'panel',style:'margin-top:8px;background:#fffdf3'},
@@ -843,7 +845,7 @@ function evEditPanel(who){
 const eventsCSV=()=>toCSV([['ID','CodeName','Name','DateID','Phase','Minute','Order','TalkStartID','Memo'],...[...db.events].sort(evSort).map(e=>[e.id,e.code||'',e.name||'',dateIdOf(e.d),e.phase,evMin(e),e.order,e.talk??'',NL(e.memo)])]);
 function importEventsCSV(){ pickFile('.csv,text/csv','csv',text=>{ const rows=csvParse(text).filter(r=>r.some(c=>String(c).trim()!=='')).slice(1); let bad=0; const out=[];
   for(const r of rows){ const d=dkeyById(r[3]); if(!d||!(+r[0])){bad++;continue;} const ph=PHASES.some(p=>p[0]===String(r[4]).trim())?String(r[4]).trim():'Prepare';
-    out.push({id:+r[0],code:String(r[1]??'').trim(),name:String(r[2]??'').trim(),d,phase:ph,minute:ph==='PreShow'&&String(r[5]??'').trim()!==''?+r[5]:-1,order:+r[6]||1,talk:String(r[7]??'').trim(),memo:String(r[8]??'').replace(/\\n/g,'\n')}); }
+    out.push({id:+r[0],code:String(r[1]??'').trim(),name:String(r[2]??'').trim(),d,phase:ph,minute:hasMin(ph)&&String(r[5]??'').trim()!==''?+r[5]:-1,order:+r[6]||1,talk:String(r[7]??'').trim(),memo:String(r[8]??'').replace(/\\n/g,'\n')}); }
   snap(); db.events=out; touch(); render(); toast(out.length+'개를 불러왔어요'+(bad?' · 건너뛴 줄 '+bad+'개':''),true); }); }
 function eventTable(){
   let rows=[...db.events].sort(evSort); const all=rows.length; if(ui.date)rows=rows.filter(e=>e.d===ui.date);
@@ -861,7 +863,7 @@ function eventTable(){
           h('td',{},h('button',{class:'sm',title:'연결된 첫 대사로 이동',onclick:()=>jumpEvent(e)},'이동')),
           h('td',{},h('button',{class:'sm ghost',title:'행 삭제',onclick:()=>{snap();db.events.splice(db.events.indexOf(e),1);touch();render();toast('이벤트를 지웠어요',true);}},'✕'))); }))),
     h('div',{class:'row',style:'margin-top:8px'},h('button',{class:'pri sm',onclick:()=>{newEvent(ui.date||ALLDATES[0],'');touch();render();}},'+ 행 추가'),
-      h('span',{class:'muted'},'Phase는 한글로 보이고 CSV에는 영어로 나가요. Minute는 영업 중(PreShow)일 때만 입력돼요(-1 = 시작하자마자). TalkStartID는 같은 날짜의 대사 중에서 골라요.')));
+      h('span',{class:'muted'},'Phase는 한글로 보이고 CSV에는 영어로 나가요. Minute는 공연 전 영업 · 1부 공연 · 인터미션 · 2부 공연일 때만 입력되고, 그 단계가 시작된 뒤 몇 분째인지예요(-1 = 시작하자마자). TalkStartID는 같은 날짜의 대사 중에서 골라요.')));
 }
 /* 명령: WaitAction · End */
 const ACTDEF=['MakeDrink','ServeDrink','SelectSong','PlacePlant'];
