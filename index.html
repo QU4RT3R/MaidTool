@@ -335,7 +335,7 @@ function showTitle(){
   $('#title').style.display='flex'; $('#app').hidden=true;
 }
 function loadProject(){ pickFile('.json,application/json','text',txt=>{ try{ const d=JSON.parse(txt); if(!d||!Array.isArray(d.npcs))throw 0; start(normalize(d)); toast('세이브를 불러왔어요'); }catch(e){ toast('이 툴의 세이브 파일(.json)이 아니에요'); } }); }
-function start(d){ db=d; ui.vnpc=null; ui.line=0; $('#title').style.display='none'; $('#app').hidden=false; touch(); route(); }
+function start(d){ db=d; ui.vnpc=null;ui.vev=null; ui.line=0; $('#title').style.display='none'; $('#app').hidden=false; touch(); route(); }
 
 /* ---------- 틀 ---------- */
 const TOOLS=[['db','데이터베이스'],['coord','좌표 설정 툴'],['dialog','대화 툴']];
@@ -472,7 +472,7 @@ function unlockReport(){
     if(it.demo==='Locked')R.info.push({id,ls,msg:'['+it.src+'] '+(it.name||'')+'은(는) 데모에서 Locked라 데모에서는 이 명령이 무시돼요'}); }
   return R; }
 const ulCount=R=>R.full.length+R.demo.length+R.bad.length+eventReport().length;
-function openLine(l){ ui.tool='dialog'; ui.date=l.d; ui.vnpc=l.npc; ui.line=Math.max(0,linesOf(l.d,l.npc).indexOf(l)); closeModal(); go('dialog'); }
+function openLine(l){ ui.tool='dialog'; ui.date=l.d; ui.vnpc=l.npc;ui.vev=null; ui.line=Math.max(0,linesOf(l.d,l.npc).indexOf(l)); closeModal(); go('dialog'); }
 function unlockModal(){
   const R=unlockReport(), lineLinks=ls=>ls.map(l=>h('button',{class:'sm',onclick:()=>openLine(l)},dcode(l.d)+' · '+l.npc+' · '+(l.order)+'번 줄'));
   const itemRow=it=>h('div',{class:'iss'},h('span',{class:'tag'},it.src),h('span',{class:'grow'},(it.name||'')+' ('+it.id+')'),h('span',{class:'muted'},'정식 '+it.full+' · 데모 '+it.demo+(it.demoRaw?'':' (같음)')));
@@ -799,7 +799,7 @@ function talkOpts(k){ // 같은 날짜의 대사 (이벤트 대화 먼저)
 function newEvent(k,talk){ const id=Math.max(EVENT_ID0-1,...db.events.map(e=>+e.id||0))+1;
   const e={id,code:'Event'+(id-EVENT_ID0+1),name:'',d:k,phase:'Prepare',minute:-1,order:db.events.filter(x=>x.d===k&&x.phase==='Prepare').length+1,talk:talk||'',memo:''};
   db.events.push(e); return e; }
-function jumpEvent(e){ const l=lineById(e.talk); if(l){ openLine(l); return; } const i=dbTabList().findIndex(x=>x.k==='events'); ui.dbTab='events'; ui.date=e.d; closeModal(); go('db'); toast('연결된 첫 대사가 없어요. TalkStartID를 골라 주세요'); }
+function jumpEvent(e){ const l=lineById(e.talk); if(l&&l.d===e.d){ openLine(l); return; } ui.tool='dialog'; ui.date=e.d; ui.vev=e.id; closeModal(); go('dialog'); }
 function compactGen(k){ // 그날 랜덤 손님 칸을 방문 순서대로 Customer1, Customer2 …로 다시 번호 매긴다 (대사도 같이)
   const gv=visitsOf(k).filter(v=>isGen(v.npc)), map={}; gv.forEach((v,i)=>{ if(v.npc!==GEN+(i+1))map[v.npc]=GEN+(i+1); });
   if(!Object.keys(map).length)return;
@@ -813,16 +813,31 @@ function guestChip(k){ const d=DM[k]||{}, n=genCount(k), g=d.guests, has=g!==''&
 /* 대화 툴: 이벤트 칸 */
 function addEventHere(){ const k=ui.date, g='Event'+(Math.max(0,...evtGroups(k).map(evtNo))+1);
   const l={d:k,npc:g,order:1,speaker:'player',face:'',text:''}; db.lines.push(l); ensureLineIds(db);
-  const e=newEvent(k,String(l.id)); ui.vnpc=g; ui.line=0; touch(); render(); toast('이벤트 '+e.id+'를 만들고 첫 대사를 연결했어요'); }
+  const e=newEvent(k,String(l.id)); ui.vnpc=g;ui.vev=null; ui.line=0; touch(); render(); toast('이벤트 '+e.id+'를 만들고 첫 대사를 연결했어요'); }
+function delEvent(e){ snap(); db.events.splice(db.events.indexOf(e),1); if(String(ui.vev)===String(e.id))ui.vev=null; touch(); render(); toast('이벤트를 지웠어요 (대사는 남아 있어요)',true); }
+function evOrphanPanel(e){ // 첫 대사가 없거나 다른 날짜를 가리키는 이벤트
+  const l=lineById(e.talk), f=evFields(e);
+  return h('div',{'data-sc':'edit'},h('div',{class:'panel',style:'background:#fffdf3'},
+    h('div',{class:'row'},h('span',{class:'tag',style:'background:#ffe89a;color:#6b5200'},'이벤트'),h('h3',{class:'grow'},(e.name||e.code||'이름 없음')+' ('+e.id+')'),
+      h('button',{class:'sm pk',onclick:()=>delEvent(e)},'이벤트 삭제')),
+    h('div',{class:'errbox',style:'margin-top:8px'},!l?'이 이벤트에 연결된 첫 대사가 없어요.':'첫 대사가 다른 날짜('+dlw(l.d)+')에 있어요.'),
+    h('div',{class:'row',style:'margin-top:10px'},inp(e,'name',{ph:'이름',style:'width:140px'}),inp(e,'code',{ph:'CodeName',style:'width:120px'}),
+      h('label',{},'시간대 ',f.phase),h('label',{},'분 ',f.minute),h('label',{},'순서 ',f.order)),
+    h('div',{class:'row',style:'margin-top:8px'},h('label',{},'첫 대사 ',f.talk),inp(e,'memo',{ph:'메모',style:'width:200px'})),
+    h('div',{class:'row',style:'margin-top:12px'},h('button',{class:'pri',onclick:()=>{ const k=ui.date, g='Event'+(Math.max(0,...evtGroups(k).map(evtNo))+1), nl={d:k,npc:g,order:1,speaker:'player',face:'',text:''};
+        db.lines.push(nl); ensureLineIds(db); e.d=k; e.talk=String(nl.id); ui.vnpc=g; ui.vev=null; ui.line=0; touch(); render(); }},'+ 이 이벤트의 대화 새로 만들기'),
+      h('span',{class:'muted'},'또는 위 "첫 대사"에서 이 날짜의 기존 대사를 골라 연결해요.'))));
+}
 function eventCol(k){
   const evs=eventsOf(k), grps=evtGroups(k), linked=new Set(evs.map(e=>{const l=lineById(e.talk);return l&&l.d===k?l.npc:null;}).filter(Boolean)), loose=grps.filter(g=>!linked.has(g));
   return h('div',{class:'panel',style:'margin-top:10px'},
     h('div',{class:'row',style:'margin-bottom:6px'},h('h3',{class:'grow'},'이벤트 ('+evs.length+')'),h('button',{class:'sm pri',onclick:addEventHere},'+ 이벤트')),
     evs.map(e=>{ const l=lineById(e.talk), ok=l&&l.d===k, on=ok&&l.npc===ui.vnpc;
-      return h('div',{class:'li'+(on?' on':''),onclick:()=>{ if(ok){ui.vnpc=l.npc;ui.line=Math.max(0,linesOf(k,l.npc).indexOf(l));render();} else jumpEvent(e); }},
+      return h('div',{class:'li'+((ui.vev!=null?String(ui.vev)===String(e.id):on)?' on':''),onclick:ev=>{ if(ev.target.closest('button'))return; if(ok){ui.vnpc=l.npc;ui.vev=null;ui.line=Math.max(0,linesOf(k,l.npc).indexOf(l));} else ui.vev=e.id; render(); }},
         h('span',{class:'tag',style:'background:#ffe89a;color:#6b5200;white-space:nowrap'},phaseName(e.phase)+(evMin(e)>=0?' '+evMin(e)+'분':'')),
-        h('div',{class:'grow'},e.name||e.code||String(e.id),h('small',{},e.id+' · 순서 '+e.order+' · '+(!l?'⚠ 첫 대사 없음':!ok?'⚠ 다른 날짜 대사':grpLabel(l.npc)+' '+l.order+'번부터'))) ); }),
-    loose.map(g=>h('div',{class:'li'+(g===ui.vnpc?' on':''),onclick:()=>{ui.vnpc=g;ui.line=0;render();}},h('span',{class:'tag'},'대화'),h('div',{class:'grow'},grpLabel(g),h('small',{},'연결된 이벤트 없음 · 대사 '+linesOf(k,g).length+'줄')))),
+        h('div',{class:'grow'},e.name||e.code||String(e.id),h('small',{},e.id+' · 순서 '+e.order+' · '+(!l?'⚠ 첫 대사 없음':!ok?'⚠ 다른 날짜 대사':grpLabel(l.npc)+' '+l.order+'번부터'))),
+        h('button',{class:'sm ghost',title:'이벤트 삭제 (대사는 남아요)',onclick:()=>delEvent(e)},'✕') ); }),
+    loose.map(g=>h('div',{class:'li'+(g===ui.vnpc&&ui.vev==null?' on':''),onclick:()=>{ui.vnpc=g;ui.vev=null;ui.line=0;render();}},h('span',{class:'tag'},'대화'),h('div',{class:'grow'},grpLabel(g),h('small',{},'연결된 이벤트 없음 · 대사 '+linesOf(k,g).length+'줄')))),
     evs.length||loose.length?null:h('p',{class:'muted'},'이 날짜에는 이벤트가 없어요.'),
     h('p',{class:'muted'},'시간 순서(시간대 → 분 → 순서)로 보여요. 누르면 연결된 첫 대사로 이동해요. 이벤트 대화는 랜덤 손님에게 나눠주지 않아요.'));
 }
@@ -937,17 +952,20 @@ function visitCol(vs){
   const move=(i,dir)=>{const j=i+dir;if(j<0||j>=vs.length)return;[vs[i],vs[j]]=[vs[j],vs[i]];renum(vs);compactGen(ui.date);touch();render();};
   return h('div',{class:'panel'},
     h('div',{class:'row',style:'margin-bottom:6px'},h('h3',{class:'grow'},'방문자 ('+vs.length+')')),h('div',{class:'row',style:'margin-bottom:6px'},guestChip(ui.date)),
-    vs.map((v,i)=>h('div',{class:'li'+(v.npc===ui.vnpc?' on':''),onclick:e=>{ if(e.target.closest('button'))return; ui.vnpc=v.npc;ui.line=0;render(); }},
+    vs.map((v,i)=>h('div',{class:'li'+(v.npc===ui.vnpc&&ui.vev==null?' on':''),onclick:e=>{ if(e.target.closest('button'))return; ui.vnpc=v.npc;ui.vev=null;ui.line=0;render(); }},
       h('span',{class:'tag'},i+1),
       h('div',{class:'grow'},isGen(v.npc)?'손님 '+(genNo(v.npc)||''):npcOf(v.npc)?(npcOf(v.npc).name||v.npc):'⚠ 없는 NPC',h('small',{},(isGen(v.npc)?'랜덤 · '+v.npc:npcOf(v.npc)?kindTag(npcOf(v.npc))+' · '+v.npc:v.npc)+' · 대사 '+linesOf(ui.date,v.npc).length+'줄')),
       h('button',{class:'sm ghost',title:'순서 위로',onclick:()=>move(i,-1)},'↑'),h('button',{class:'sm ghost',title:'순서 아래로',onclick:()=>move(i,1)},'↓'),
       h('button',{class:'sm ghost',title:'이 날 방문에서 빼기',onclick:()=>{snap();db.visits.splice(db.visits.indexOf(v),1);db.lines=db.lines.filter(l=>!(l.d===ui.date&&l.npc===v.npc));renum(visitsOf(ui.date));compactGen(ui.date);touch();render();toast('방문자와 그날 대사를 지웠어요',true);}},'✕'))),
     vs.length?null:h('p',{class:'muted'},'이 날짜에는 아직 방문자가 없어요.'),
-    rest.length?h('div',{class:'row',style:'margin-top:8px'},pick,h('button',{class:'pri sm',onclick:()=>{const id=pick.value==='__gen'?GEN+(Math.max(0,...vs.filter(v=>isGen(v.npc)).map(v=>genNo(v.npc)))+1):pick.value;db.visits.push({d:ui.date,npc:id,order:vs.length+1});ui.vnpc=id;compactGen(ui.date);ui.line=0;touch();render();}},'+ 방문자')):
+    rest.length?h('div',{class:'row',style:'margin-top:8px'},pick,h('button',{class:'pri sm',onclick:()=>{const id=pick.value==='__gen'?GEN+(Math.max(0,...vs.filter(v=>isGen(v.npc)).map(v=>genNo(v.npc)))+1):pick.value;db.visits.push({d:ui.date,npc:id,order:vs.length+1});ui.vnpc=id;ui.vev=null;compactGen(ui.date);ui.line=0;touch();render();}},'+ 방문자')):
       h('p',{class:'muted'},'고를 수 있는 방문자가 모두 들어 있어요.'),
     h('p',{class:'muted'},'고를 수 있는 방문자: 손님(랜덤, 여러 명 가능) · 밴드멤버 '+cnt('band')+'명 · 특별손님 '+cnt('special')+'명 · 지금 손님 '+vs.filter(v=>isGen(v.npc)).length+'명'));
 }
 function editCol(){
+  if(ui.vev!=null){ const e=db.events.find(x=>String(x.id)===String(ui.vev)&&x.d===ui.date), l=e&&lineById(e.talk);
+    if(e&&!(l&&l.d===e.d))return evOrphanPanel(e);
+    if(e&&l){ ui.vnpc=l.npc; ui.line=Math.max(0,linesOf(l.d,l.npc).indexOf(l)); } ui.vev=null; }
   const L=curLines();
   if(!L) return h('div',{class:'panel'},h('p',{class:'muted'},'왼쪽에서 방문자를 추가하거나 골라 주세요.'));
   const who=ui.vnpc, isE=isEvtGrp(who), me=isE?'player':isGen(who)?GEN:who, others=talkers().filter(n=>n.id!==who);
