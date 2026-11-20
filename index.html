@@ -270,6 +270,7 @@ function normalize(d){ // 오래된 세이브·빠진 필드 보정
   }
   for(const t of d.tables)if(t.kind==='item'||t.kind==='recipe')t.kind='';
   for(const x of [...d.visits,...d.lines])if(x.npc===GEN)x.npc=GEN+'1'; // 손님 한 묶음이던 때의 값
+  if(d.talkPrefix!=null&&/^\d*$/.test(String(d.talkPrefix)))delete d.talkPrefix; // 예전 숫자형 ID(30…) 설정
   applyUnlockDefaults(d); ensureLineIds(d); ensureConv(d);
   return d;
 }
@@ -474,14 +475,15 @@ function unlockReport(){
     if(it.full!=='Story'&&it.demo!=='Story')R.bad.push({id,ls,msg:'['+it.src+'] '+(it.name||'')+'은(는) 정식판·데모판 모두 Story가 아니에요'});
     if(it.demo==='Locked')R.info.push({id,ls,msg:'['+it.src+'] '+(it.name||'')+'은(는) 데모에서 Locked라 데모에서는 이 명령이 무시돼요'}); }
   return R; }
-const ulCount=R=>R.full.length+R.demo.length+R.bad.length+eventReport().length+talkIdReport().length;
+const ulCount=R=>R.full.length+R.demo.length+R.bad.length+eventReport().length+talkIdReport().length+idReport().length;
 function openLine(l){ ui.tool='dialog'; ui.date=l.d; ui.vnpc=l.npc;ui.vev=null; ui.line=Math.max(0,linesOf(l.d,l.npc).indexOf(l)); closeModal(); go('dialog'); }
 function unlockModal(){
   const R=unlockReport(), lineLinks=ls=>ls.map(l=>h('button',{class:'sm',onclick:()=>openLine(l)},dcode(l.d)+' · '+l.npc+' · '+(l.order)+'번 줄'));
   const itemRow=it=>h('div',{class:'iss'},h('span',{class:'tag'},it.src),h('span',{class:'grow'},(it.name||'')+' ('+it.id+')'),h('span',{class:'muted'},'정식 '+it.full+' · 데모 '+it.demo+(it.demoRaw?'':' (같음)')));
   const sec=(title,kind,list,row)=>h('div',{class:'sec'},h('h4',{},title+' ('+list.length+')'),list.length?list.map(row):h('span',{class:'muted'},'없어요'));
-  const ER=eventReport(), TR=talkIdReport();
+  const ER=eventReport(), TR=talkIdReport(), IR=idReport();
   modal('검사',h('div',{},
+    sec('경고 · ID 중복 (손님 · 표 · 이벤트 · 대사 전체)','dup',IR,x=>h('div',{class:'iss'},h('span',{class:'tag pk'},x.id),h('span',{class:'grow'},x.msg))),
     sec('경고 · 대화 ID','tid',TR,x=>h('div',{class:'iss'},h('span',{class:'grow'},x.msg),h('button',{class:'sm',onclick:()=>{ui.tool='dialog';ui.date=x.d;closeModal();go('dialog');}},'이동'))),
     sec('경고 · 이벤트 (강제 진행)','ev',ER,x=>h('div',{class:'iss'},h('span',{class:'tag pk'},String(x.e.id)),h('span',{class:'grow'},(x.e.name||x.e.code||'')+' · '+dcode(x.e.d)+' · '+phaseName(x.e.phase)+' — '+x.msg),h('button',{class:'sm',onclick:()=>jumpEvent(x.e)},'이동'))),
     sec('경고 · 정식판에서 Story인데 어떤 대사에서도 열지 않는 항목','full',R.full,itemRow),
@@ -777,11 +779,13 @@ function coordView(){
 }
 
 /* ---------- 대화 ID 규칙: [앞자리 30][DDDD 날짜][EE 그날 대화 번호][TTT 대화 박스 번호] ----------
-   예: 7월 11일 3번 대화의 47번째 박스 → 30 0711 03 047 → 30071103047. 데모 1일차는 DDDD = 0001.
+   형식: D + 날짜 4자리 + _ + 대화 번호 + _ + 말풍선 번호 (문자열). 예: 12월 3일 1번 대화의 1번 말풍선 → D1203_001_001. 데모 1일차 날짜는 0001.
    EE는 그날의 대화 묶음(랜덤 손님 · 밴드멤버 · 특별손님 · 이벤트 대화 모두)마다 한 번 정해지면 바뀌지 않는다.
    내부에서는 줄마다 바뀌지 않는 번호(l.id)를 따로 쓰고, 화면과 CSV에는 이 규칙의 ID를 보여 준다. */
 const convKey=(k,npc)=>k+'|'+npc;
-const talkPrefix=()=>String(db&&db.talkPrefix!=null?db.talkPrefix:'30');
+const talkPrefix=()=>String(db&&db.talkPrefix!=null&&db.talkPrefix!==''?db.talkPrefix:'D');
+const talkW=()=>Object.assign({conv:3,box:3},db&&db.talkW); // 대화 번호 · 말풍선 번호 자릿수
+const wMax=n=>Math.pow(10,n)-1;
 function convGroups(d,k){ // 그날 대화 묶음: 방문자(방문 순서) → 이벤트 대화 → 그 밖의 대사 묶음
   const vs=d.visits.filter(v=>v.d===k).sort(byOrder).map(v=>v.npc), ls=[...new Set(d.lines.filter(l=>l.d===k).map(l=>l.npc))];
   return [...new Set([...vs,...ls.filter(isEvtGrp).sort((a,b)=>evtNo(a)-evtNo(b)),...ls])]; }
@@ -792,17 +796,33 @@ function ensureConv(d){ if(!d||!d.visits||!d.lines)return; d.conv=d.conv||{}; co
 const convNo=(k,npc)=>(db.conv||{})[convKey(k,npc)]||0;
 const pad=(v,n)=>String(v).padStart(n,'0');
 const dateDigits=k=>{ const [m,d]=String(k).split('-'); return pad(+m||0,2)+pad(+d||0,2); };
-const talkCode=l=>l?talkPrefix()+dateDigits(l.d)+pad(convNo(l.d,l.npc),2)+pad(+l.order||0,3):'';
-const convTag=(k,npc)=>'대화 '+pad(convNo(k,npc),2);
-function parseTalkCode(v){ const m=String(v??'').trim().match(/^(\d+)(\d{4})(\d{2})(\d{3})$/); return m&&String(v).trim().length>=10?{ee:+m[3],ttt:+m[4]}:null; }
-function talkIdReport(){ const R=[], seen={};
-  for(const k in (db.conv||{})){ const [d]=k.split('|'), n=db.conv[k]; (seen[d+'|'+n]=seen[d+'|'+n]||[]).push(k.slice(d.length+1)); if(n>99)R.push({d,msg:dlw(d)+'의 대화 번호가 99를 넘었어요 ('+n+')'}); }
-  for(const k in seen) if(seen[k].length>1){ const [d,n]=k.split('|'); R.push({d,msg:dlw(d)+'에 대화 번호 '+pad(n,2)+'이(가) 겹쳐요: '+seen[k].join(', ')}); }
-  for(const l of db.lines) if(+l.order>999)R.push({d:l.d,msg:dlw(l.d)+' '+grpLabel(l.npc)+'의 대화 박스가 999개를 넘었어요'});
+const talkCode=l=>l?talkPrefix()+dateDigits(l.d)+'_'+pad(convNo(l.d,l.npc),talkW().conv)+'_'+pad(+l.order||0,talkW().box):'';
+const convTag=(k,npc)=>'대화 '+pad(convNo(k,npc),talkW().conv);
+function parseTalkCode(v){ v=String(v??'').trim(); let m=v.match(/^[A-Za-z]*(\d{4})_(\d+)_(\d+)$/); if(m)return {ee:+m[2],ttt:+m[3]}; m=v.match(/^(\d+)(\d{4})(\d{2})(\d{3})$/); return m&&v.length>=10?{ee:+m[3],ttt:+m[4]}:null; }
+function talkIdReport(){ const R=[], seen={}, W=talkW();
+  for(const k in (db.conv||{})){ const [d]=k.split('|'), n=db.conv[k]; (seen[d+'|'+n]=seen[d+'|'+n]||[]).push(k.slice(d.length+1)); if(n>wMax(W.conv))R.push({d,msg:dlw(d)+'의 대화 번호가 '+wMax(W.conv)+'을(를) 넘었어요 ('+n+')'}); }
+  for(const k in seen) if(seen[k].length>1){ const [d,n]=k.split('|'); R.push({d,msg:dlw(d)+'에 대화 번호 '+pad(n,W.conv)+'이(가) 겹쳐요: '+seen[k].join(', ')}); }
+  for(const l of db.lines) if(+l.order>wMax(W.box))R.push({d:l.d,msg:dlw(l.d)+' '+grpLabel(l.npc)+'의 말풍선이 '+wMax(W.box)+'개를 넘었어요'});
   return R; }
 function convNoEdit(k,npc){ // 대화 번호 직접 바꾸기 (겹치면 검사에서 경고)
-  const e=h('input',{type:'number',min:1,max:99,value:convNo(k,npc),style:'width:64px',title:'그날 대화 번호 (EE)'});
-  e.addEventListener('change',()=>{ const v=Math.max(1,Math.min(99,Math.round(+e.value)||1)); db.conv[convKey(k,npc)]=v; touch(); render(); }); return e; }
+  const e=h('input',{type:'number',min:1,max:wMax(talkW().conv),value:convNo(k,npc),style:'width:64px',title:'그날 대화 번호'});
+  e.addEventListener('change',()=>{ const v=Math.max(1,Math.min(wMax(talkW().conv),Math.round(+e.value)||1)); db.conv[convKey(k,npc)]=v; touch(); render(); }); return e; }
+
+/* ---------- 전체 ID 중복 검사 ----------
+   손님 4분류의 ID(숫자), 불러온 표들의 ID 열, 이벤트 ID, 대화 ID(TalkID)를 모아
+   같은 곳 안에서 겹치는지, 서로 다른 곳끼리 겹치는지 본다. */
+function idSources(){ const S=[];
+  for(const [k,l] of NKL()) S.push({src:l,ids:db.npcs.filter(n=>(n.kind||'normal')===k).map(n=>String(n.num||'').trim()).filter(Boolean)});
+  for(const t of db.tables){ const lc=t.cols.map(c=>String(c).trim().toLowerCase()); let ii=lc.indexOf('id'); if(ii<0)ii=0;
+    S.push({src:t.name||'이름 없는 표',ids:t.rows.map(r=>String(r[ii]??'').trim()).filter(Boolean)}); }
+  S.push({src:'이벤트 목록',ids:db.events.map(e=>String(e.id??'').trim()).filter(Boolean)});
+  S.push({src:'대사 (TalkID)',ids:db.lines.map(talkCode)});
+  return S; }
+function idReport(){ const R=[], where={};
+  for(const s of idSources()){ const cnt={}; for(const id of s.ids){ cnt[id]=(cnt[id]||0)+1; (where[id]=where[id]||new Set()).add(s.src); }
+    for(const id in cnt) if(cnt[id]>1) R.push({id,msg:s.src+' 안에서 '+cnt[id]+'번 나와요'}); }
+  for(const id in where) if(where[id].size>1) R.push({id,msg:'여러 곳에서 같은 ID를 써요: '+[...where[id]].join(', ')});
+  return R; }
 
 /* ---------- 대사 ID · 이벤트(강제 진행) ----------
    대사 줄마다 고유 TalkID(240001~)를 붙여, 이벤트 표의 TalkStartID가 가리킬 수 있게 한다.
@@ -1062,7 +1082,10 @@ function talkTable(which){
   const argIn=r=>{const e=h('input',{type:'text',value:r.arg??'',style:'min-width:110px'});e.addEventListener('input',()=>{r.arg=e.value;touch();});return e;};
   return h('div',{class:'panel'},
     h('div',{class:'row',style:'margin-bottom:8px'},h('h3',{},isV?'날짜별 방문자':'대사'),
-      isV?null:h('label',{class:'muted',title:'TalkID = 앞자리 + 날짜 4자리 + 대화 번호 2자리 + 박스 번호 3자리'},'대화 ID 앞자리 ',(()=>{ const e=h('input',{type:'text',value:talkPrefix(),style:'width:56px'}); e.addEventListener('change',()=>{ db.talkPrefix=e.value.replace(/\D/g,''); touch(); render(); }); return e; })()),
+      isV?null:h('span',{class:'muted',title:'TalkID = 앞글자 + 날짜 4자리 + _ + 대화 번호 + _ + 말풍선 번호'},'대화 ID: ',
+        (()=>{ const e=h('input',{type:'text',value:talkPrefix(),style:'width:44px',title:'앞글자'}); e.addEventListener('change',()=>{ db.talkPrefix=e.value.trim(); touch(); render(); }); return e; })(),' 날짜 _ ',
+        (()=>{ const e=h('input',{type:'number',min:1,max:6,value:talkW().conv,style:'width:52px',title:'대화 번호 자릿수'}); e.addEventListener('change',()=>{ db.talkW=Object.assign(talkW(),{conv:Math.max(1,Math.min(6,+e.value||3))}); touch(); render(); }); return e; })(),'자리 _ ',
+        (()=>{ const e=h('input',{type:'number',min:1,max:6,value:talkW().box,style:'width:52px',title:'말풍선 번호 자릿수'}); e.addEventListener('change',()=>{ db.talkW=Object.assign(talkW(),{box:Math.max(1,Math.min(6,+e.value||3))}); touch(); render(); }); return e; })(),'자리 · 예: '+(db.lines[0]?talkCode(db.lines[0]):'D1203_001_001')),
       h('span',{class:'muted grow'},ui.date?dcode(ui.date)+'만 보는 중 ('+rows.length+' / 전체 '+all+'행) · 달력에서 날짜를 해제하면 전체가 보여요':'전체 '+all+'행 · 달력에서 날짜를 고르면 그날만 보여요'),
       h('button',{class:'sm',onclick:()=>importTalkCSV(which)},'CSV 불러오기 (덮어쓰기)'),
       h('button',{class:'sm',onclick:()=>saveFile(exportFiles()[isV?'date':'dlg'].find(f=>f.key===which).file+'.csv','﻿'+(isV?visitsCSV():linesCSV()))},'CSV 내보내기')),
@@ -1211,8 +1234,8 @@ function unityExport(){
   return {npcs:db.npcs.map(n=>({id:n.id,unityId:n.num||'',name:n.name,category:n.kind||'normal',portraits:facesOf(n.id),extra:((db.ncols||{})[n.kind||'normal']||[]).map(c=>({name:c.name,value:String((n.x||{})[c.key]??'')}))})),
     tables:db.tables.map(t=>({name:t.name,kind:t.kind||'',columns:t.cols,rows:t.rows.map(r=>({cells:r.map(c=>String(c??''))}))})),
     visitors:sortedVisits().map(v=>({dateId:dcode(v.d),npcId:v.npc,order:+v.order||0})),
-    events:[...db.events].sort(evSort).map(e=>({id:+e.id,codeName:e.code||'',name:e.name||'',dateId:String(dateIdOf(e.d)),phase:e.phase,minute:evMin(e),order:+e.order||0,talkStartId:+talkCode(lineById(e.talk))||0,memo:e.memo||''})),
-    dialogues:sortedLines().map(l=>({talkId:+talkCode(l),dateId:dcode(l.d),npcId:l.npc,order:+l.order||0,type:isEv(l)?l.type:'Talk',arg:isEv(l)?String(l.arg??''):'',speakerId:l.speaker,portrait:l.speaker==='player'?'':(l.face||''),text:isEv(l)?'':(l.text||''),command:l.cmd||''})),
+    events:[...db.events].sort(evSort).map(e=>({id:+e.id,codeName:e.code||'',name:e.name||'',dateId:String(dateIdOf(e.d)),phase:e.phase,minute:evMin(e),order:+e.order||0,talkStartId:talkCode(lineById(e.talk)),memo:e.memo||''})),
+    dialogues:sortedLines().map(l=>({talkId:talkCode(l),dateId:dcode(l.d),npcId:l.npc,order:+l.order||0,type:isEv(l)?l.type:'Talk',arg:isEv(l)?String(l.arg??''):'',speakerId:l.speaker,portrait:l.speaker==='player'?'':(l.face||''),text:isEv(l)?'':(l.text||''),command:l.cmd||''})),
     npcSpawns:Object.keys(db.coord.daily).flatMap(k=>Object.keys(db.coord.daily[k]).flatMap(sid=>Object.keys(db.coord.daily[k][sid]).map(c=>{const o=db.coord.daily[k][sid][c],p=kxy(c);return Object.assign(date(k),{slot:sid,npcId:o.npc||'',name:cname(o),x:p.x,y:p.y});}))),
     fixedNpcs:Object.keys(db.coord.fixed).map(c=>{const f=db.coord.fixed[c],p=kxy(c);return {npcId:f.npc||'',name:cname(f),x:p.x,y:p.y,slots:f.slots||SLOTS.map(x=>x[0]),exceptDates:(f.except||[]).map(date)};})};
 }
