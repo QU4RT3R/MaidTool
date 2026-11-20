@@ -165,6 +165,7 @@ td.num{text-align:right;font:12px ui-monospace,Consolas,monospace;width:1px;whit
 .grid th{position:sticky;top:0;background:#f6f7f9;z-index:1;padding:0 6px}
 .grid select{border:0;border-radius:0;background:transparent;width:100%;min-width:96px}
 td:has(select.demoset){background:#ffe7a8} select.demoset{font-weight:700} select.ul-Locked{color:#b93a50} select.ul-Story{color:#2b6fb0} select.ul-Default{color:#3a8f5b}
+select.cmdend{background:#ffe7a8;border-color:#e0a800;font-weight:700}
 th.ulth{background:#eef6fe;white-space:nowrap} select.cmdset{background:var(--skyl);border-color:var(--sky)}
 .grid input{border:0;border-radius:0;background:transparent;width:100%;min-width:96px;padding:5px 8px}
 </style>
@@ -221,7 +222,7 @@ let db=null, undoSnap=null, saveT=null;
 const ui={vnpc:null,tool:'dialog',tab:'edit',dlg:null,line:0,date:null,dateOnly:true,q:'',fNpc:'',fStatus:'',fFlag:'',dbTab:'normal',pvOpen:false,flowNpc:'',coordNpc:''};
 
 function blankDB(sample){
-  const d={app:'merongtool',version:1,name:'새 프로젝트',npcs:[],ncols:{},nseq:1,nlabel:{},nfile:{},xfile:{},schema:3,tables:[defaultDateTable()],visits:[],lines:[],coord:freshCoord(),
+  const d={app:'merongtool',version:1,name:'새 프로젝트',npcs:[],ncols:{},nseq:1,nlabel:{},nfile:{},xfile:{},schema:3,tables:[defaultDateTable()],visits:[],lines:[],events:[],coord:freshCoord(),
     preview:{v:2,w:480,rows:3,font:20,lineH:28,pad:14,scale:1,speed:40,pixel:true,bubbleImg:'',standImg:'',stands:{},standBack:false,sx:'',sy:'',tx:'',ty:'',tw:'',showName:true,nx:'',ny:''}};
   ensureNpcCols(d);
   d.nunlock={normal:true};
@@ -239,6 +240,8 @@ function blankDB(sample){
       {d:'6-1',npc:'Customer2',order:1,speaker:'Customer',face:'기본',text:'여기 분위기 좋네요.'},
       {d:'6-1',npc:'Luna',order:1,speaker:'Luna',face:'졸림',text:'여기 조용해서 좋다….\\! 한숨 자도 돼?'},
       {d:'6-5',npc:'Luna',order:1,speaker:'Luna',face:'기본',text:'저번에 얘기 들었어.\n오늘은 안 졸려.'}];
+    d.lines.push({d:'6-1',npc:'Event1',order:1,speaker:'Rio',face:'기본',text:'오늘 첫 공연이야. 곡부터 골라 볼까?',cmd:'WaitAction:SelectSong'},{d:'6-1',npc:'Event1',order:2,speaker:'Rio',face:'기본',text:'좋아, 이 곡으로 가자!',cmd:'End'});
+    ensureLineIds(d); { const f=d.lines.find(l=>l.npc==='Event1'&&l.order===1); d.events=[{id:230001,code:'FirstStage',name:'첫 공연 준비',d:'6-1',phase:'SongSelect',minute:-1,order:1,talk:String(f.id),memo:'곡 선택 튜토리얼'}]; }
     applyUnlockDefaults(d);
     { const t=d.tables[1]; t.rows[0][t.cols.indexOf('UnlockType')]='Story'; const t2=d.tables[2]; t2.rows[0][t2.cols.indexOf('DemoUnlockType')]='Locked'; }
     { const g={}; d.lines.forEach(l=>(g[l.d+'|'+l.npc]=g[l.d+'|'+l.npc]||[]).push(l)); Object.values(g).forEach(arr=>arr.sort((x,y)=>x.order-y.order).forEach((l,i)=>l.order=i+1)); }
@@ -267,10 +270,10 @@ function normalize(d){ // 오래된 세이브·빠진 필드 보정
   }
   for(const t of d.tables)if(t.kind==='item'||t.kind==='recipe')t.kind='';
   for(const x of [...d.visits,...d.lines])if(x.npc===GEN)x.npc=GEN+'1'; // 손님 한 묶음이던 때의 값
-  applyUnlockDefaults(d);
+  applyUnlockDefaults(d); ensureLineIds(d);
   return d;
 }
-function touch(){ clearTimeout(saveT); saveT=setTimeout(()=>{ try{localStorage.setItem(LS,JSON.stringify({t:Date.now(),db}));}catch(e){ try{localStorage.setItem(LS,JSON.stringify({t:Date.now(),db:Object.assign({},db,{coord:Object.assign({},db.coord,{bg:null}),preview:Object.assign({},db.preview,{bubbleImg:'',standImg:'',stands:{}})})}));touch.lite=true;}catch(e2){} } const s=$('#saved'); if(s)s.textContent=(touch.lite?'자동 저장됨 (이미지는 용량 때문에 제외 · 세이브 저장에는 포함) ':'자동 저장됨 ')+new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}); },500); }
+function touch(){ if(db)ensureLineIds(db); clearTimeout(saveT); saveT=setTimeout(()=>{ try{localStorage.setItem(LS,JSON.stringify({t:Date.now(),db}));}catch(e){ try{localStorage.setItem(LS,JSON.stringify({t:Date.now(),db:Object.assign({},db,{coord:Object.assign({},db.coord,{bg:null}),preview:Object.assign({},db.preview,{bubbleImg:'',standImg:'',stands:{}})})}));touch.lite=true;}catch(e2){} } const s=$('#saved'); if(s)s.textContent=(touch.lite?'자동 저장됨 (이미지는 용량 때문에 제외 · 세이브 저장에는 포함) ':'자동 저장됨 ')+new Date().toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit'}); },500); }
 function snap(){ undoSnap=JSON.stringify(db); }
 function toast(msg,undo){ const t=$('#toast'); put(t,msg, undo&&undoSnap? h('button',{class:'sm',onclick:()=>{db=JSON.parse(undoSnap);undoSnap=null;touch();render();t.style.display='none';}},'되돌리기'):null);
   t.style.display='flex'; clearTimeout(toast.t); toast.t=setTimeout(()=>t.style.display='none',undo?6000:2600); }
@@ -357,11 +360,11 @@ function renderTop(){
     inp(db,'name',{ph:'프로젝트 이름',style:'width:180px'}),
     h('span',{class:'muted grow',id:'saved'},''),
     h('button',{class:'pri',onclick:saveModal},'세이브 저장'),
-    h('button',{id:'ulbtn',onclick:unlockModal},'해금 검사'),
+    h('button',{id:'ulbtn',onclick:unlockModal},'검사'),
     h('button',{onclick:exportModal},'내보내기'),
     h('button',{class:'ghost',onclick:()=>{ put($('#top'),); showTitle(); }},'타이틀로'));
 }
-function dateSets(){ const s=new Set(); for(const v of db.visits)s.add(v.d); for(const k in db.coord.daily) if(Object.values(db.coord.daily[k]).some(o=>Object.keys(o).length))s.add(k); return s; }
+function dateSets(){ const s=new Set(); for(const v of db.visits)s.add(v.d); for(const l of db.lines)s.add(l.d); for(const e of db.events)s.add(e.d); for(const k in db.coord.daily) if(Object.values(db.coord.daily[k]).some(o=>Object.keys(o).length))s.add(k); return s; }
 /* ---------- 날짜 데이터 (kind:'date' 표) ---------- */
 const DOW='일월화수목금토';
 const DATECOLS=['ID','CodeName','Name','월','일','요일','가게영업여부','진행이벤트','오늘의 일반 손님 예정','예정 특별손님ID 1','예정 특별손님ID 2','예정 특별손님ID 3','예정 특별손님ID 4','메모'];
@@ -397,7 +400,7 @@ const dlw=k=>dl(k)+(dowOf(k)>=0?' ('+DOW[dowOf(k)]+')':'');
 function dateChips(k){ const d=DM[k]; if(!d)return h('span',{class:'muted'},'날짜 표에 이 날짜가 없어요');
   return [h('span',{class:'tag '+(d.closed?'pk':'moss')},d.closed?'휴무':'영업'),
     d.event?h('span',{class:'tag',style:'background:#ffe89a;color:#6b5200'},'이벤트 '+d.event):null,
-    d.guests!==''&&d.guests!=null?h('span',{class:'tag'},'일반 손님 '+d.guests):null,
+    guestChip(k),
     (d.special||[]).map(id=>h('span',{class:'tag sky'},'특별 '+(npcOf(id)?(npcOf(id).name||id)+' ('+id+')':id))),
     d.memo?h('span',{class:'muted'},'메모: '+d.memo):null,
     h('button',{class:'sm ghost',onclick:()=>{const i=db.tables.findIndex(t=>t.kind==='date');if(i>=0){ui.dbTab='t'+i;go('db');}}},'날짜 표 열기')]; }
@@ -405,7 +408,7 @@ function renderCal(){
   const has=dateSets();
   const day=(k,label,st)=>{ const w=dowOf(k), d=DM[k]||{};
     return h('button',{class:(ui.date===k?'on ':'')+(has.has(k)?'has ':'')+(w===0?'sun ':w===6?'sat ':'')+(d.closed?'closed':''),style:st,
-      title:dlw(k)+(d.closed?' · 휴무':'')+(d.event?' · '+d.event:'')+(d.special&&d.special.length?' · 특별손님 '+d.special.length+'명':'')+(d.memo?' · '+d.memo:''),
+      title:dlw(k)+(d.closed?' · 휴무':'')+(d.event?' · '+d.event:'')+' · 랜덤 대화 '+genCount(k)+(d.guests!==''&&d.guests!=null?' / 손님 '+d.guests:'')+(db.events.some(e=>e.d===k)?' · 이벤트 '+db.events.filter(e=>e.d===k).length+'개':'')+(d.special&&d.special.length?' · 특별손님 '+d.special.length+'명':'')+(d.memo?' · '+d.memo:''),
       onclick:()=>{ui.date=ui.date===k?null:k;render();}},label); };
   put($('#cal'),
     h('div',{class:'row'},h('span',{class:'tag '+(ui.date?'sky':'')},ui.date?dlw(ui.date):'날짜 전체'),ui.date?h('button',{class:'sm',onclick:()=>{ui.date=null;render();}},'해제'):null),
@@ -448,9 +451,14 @@ function unlockItems(){ const out=[];
   return out; }
 const ulTargets=()=>unlockItems().filter(it=>it.full==='Story'||it.demo==='Story');
 const cmdId=l=>{ const m=String(l.cmd||'').match(/^Unlock:(.+)$/); return m?m[1].trim():null; };
-function cmdSel(l){ // 대사 한 줄에 다는 해금 명령 (Unlock:ID)
-  const opts=[['','명령 없음'],...ulTargets().map(it=>['Unlock:'+it.id,'해금 · ['+it.src+'] '+(it.name?it.name+' ':'')+'('+it.id+')'+(it.full!=='Story'?' · 데모에서만 Story':it.demo!=='Story'?' · 정식판에서만 Story':'')])];
-  const e=sel(opts,l.cmd||'',v=>{ if(v)l.cmd=v; else delete l.cmd; },'max-width:440px'); if(l.cmd)e.classList.add('cmdset'); return e; }
+function cmdSel(l){ // 대사 한 줄에 다는 명령: Unlock:ID / WaitAction:행동 / End
+  const groups=[['해금 (Unlock)',ulTargets().map(it=>['Unlock:'+it.id,'해금 · ['+it.src+'] '+(it.name?it.name+' ':'')+'('+it.id+')'+(it.full!=='Story'?' · 데모에서만 Story':it.demo!=='Story'?' · 정식판에서만 Story':'')])],
+    ['행동 기다리기 (WaitAction)',actions().map(a=>['WaitAction:'+a,'행동 기다리기 · '+a])],['이벤트',[['End','이벤트 종료 (End)']]]];
+  const e=h('select',{style:'max-width:440px'}); e.append(h('option',{value:''},'명령 없음')); let found=!l.cmd;
+  for(const [g,opts] of groups){ if(!opts.length)continue; const og=h('optgroup',{label:g}); for(const [v,t] of opts){ og.append(h('option',{value:v},t)); if(v===l.cmd)found=true; } e.append(og); }
+  if(!found)e.append(h('option',{value:l.cmd},'⚠ '+l.cmd));
+  e.value=l.cmd||''; e.addEventListener('change',()=>{ if(e.value)l.cmd=e.value; else delete l.cmd; touch(); render(); });
+  if(l.cmd)e.classList.add(l.cmd==='End'?'cmdend':'cmdset'); return e; }
 function unlockReport(){
   const items=unlockItems(), used={}, byId={}, R={full:[],demo:[],bad:[],info:[]};
   for(const l of db.lines){ const id=cmdId(l); if(id)(used[id]=used[id]||[]).push(l); }
@@ -463,20 +471,22 @@ function unlockReport(){
     if(it.full!=='Story'&&it.demo!=='Story')R.bad.push({id,ls,msg:'['+it.src+'] '+(it.name||'')+'은(는) 정식판·데모판 모두 Story가 아니에요'});
     if(it.demo==='Locked')R.info.push({id,ls,msg:'['+it.src+'] '+(it.name||'')+'은(는) 데모에서 Locked라 데모에서는 이 명령이 무시돼요'}); }
   return R; }
-const ulCount=R=>R.full.length+R.demo.length+R.bad.length;
+const ulCount=R=>R.full.length+R.demo.length+R.bad.length+eventReport().length;
 function openLine(l){ ui.tool='dialog'; ui.date=l.d; ui.vnpc=l.npc; ui.line=Math.max(0,linesOf(l.d,l.npc).indexOf(l)); closeModal(); go('dialog'); }
 function unlockModal(){
   const R=unlockReport(), lineLinks=ls=>ls.map(l=>h('button',{class:'sm',onclick:()=>openLine(l)},dcode(l.d)+' · '+l.npc+' · '+(l.order)+'번 줄'));
   const itemRow=it=>h('div',{class:'iss'},h('span',{class:'tag'},it.src),h('span',{class:'grow'},(it.name||'')+' ('+it.id+')'),h('span',{class:'muted'},'정식 '+it.full+' · 데모 '+it.demo+(it.demoRaw?'':' (같음)')));
   const sec=(title,kind,list,row)=>h('div',{class:'sec'},h('h4',{},title+' ('+list.length+')'),list.length?list.map(row):h('span',{class:'muted'},'없어요'));
-  modal('해금 검사',h('div',{},
+  const ER=eventReport();
+  modal('검사',h('div',{},
+    sec('경고 · 이벤트 (강제 진행)','ev',ER,x=>h('div',{class:'iss'},h('span',{class:'tag pk'},String(x.e.id)),h('span',{class:'grow'},(x.e.name||x.e.code||'')+' · '+dcode(x.e.d)+' · '+phaseName(x.e.phase)+' — '+x.msg),h('button',{class:'sm',onclick:()=>jumpEvent(x.e)},'이동'))),
     sec('경고 · 정식판에서 Story인데 어떤 대사에서도 열지 않는 항목','full',R.full,itemRow),
     sec('경고 · 데모판에서 Story인데 어떤 대사에서도 열지 않는 항목','demo',R.demo,itemRow),
     sec('경고 · 확인이 필요한 Unlock 명령','bad',R.bad,x=>h('div',{class:'iss'},h('span',{class:'tag pk'},'Unlock:'+x.id),h('span',{class:'grow'},x.msg),lineLinks(x.ls))),
     sec('정보 · 데모에서 Locked인 항목을 여는 명령 (데모에서는 무시)','info',R.info,x=>h('div',{class:'iss'},h('span',{class:'tag sky'},'Unlock:'+x.id),h('span',{class:'grow'},x.msg),lineLinks(x.ls))),
     h('p',{class:'muted'},'데모판 기준은 DemoUnlockType이 있으면 그 값, 없으면 UnlockType이에요. 해금 열은 각 표 위쪽의 "해금 열" 체크로 켜고 끕니다.')));
 }
-function updateUlBadge(){ const b=$('#ulbtn'); if(!b||!db)return; const n=ulCount(unlockReport()); put(b,'해금 검사',n?h('span',{class:'badge'},n):null); }
+function updateUlBadge(){ const b=$('#ulbtn'); if(!b||!db)return; const n=ulCount(unlockReport()); put(b,'검사',n?h('span',{class:'badge'},n):null); }
 
 /* ---------- 데이터베이스 ---------- */
 const NK=[['normal','손님(NPC)'],['special','특별손님'],['band','밴드멤버'],['talk','대사만 있는 손님']];
@@ -484,10 +494,11 @@ const NKL=()=>NK.map(([k,l])=>[k,((db.nlabel||{})[k]||'').trim()||l]);
 const NCOLS=[['num','ID (숫자)'],['id','이름표 (CodeName, 영문)'],['name','한글 이름'],['faces','표정 목록 (쉼표로 구분)']];
 // 유니티 임포터가 열 순서로 읽기 때문에, 아래 기본 열은 항상 맨 앞에 이 순서로 둔다
 const NVAL=['Value_Happy_Min','Value_Happy_Max','Value_Anger_Min','Value_Anger_Max','Value_Love_Min','Value_Love_Max','Value_Sad_Min','Value_Sad_Max'];
-const NDEF={normal:['TalkStartID',...NVAL],special:['TalkStartID',...NVAL],band:['TalkStartID'],talk:['TalkStartID']};
+const NDEF={normal:[...NVAL],special:[...NVAL],band:[],talk:[]}; // 대화 시작 ID(TalkStartID)는 대사 표에서 날짜+NPC로 묶어서 쓰므로 NPC 표에는 두지 않는다
 function ensureNpcCols(d){ d.ncols=d.ncols||{};
   for(const k in NDEF){ const cur=d.ncols[k]||[]; const def=NDEF[k].map(n=>cur.find(c=>c.name===n)||{key:n,name:n,type:'number',options:[]}); def.forEach(c=>c.fixed=true);
-    d.ncols[k]=[...def,...cur.filter(c=>!NDEF[k].includes(c.name))]; } }
+    d.ncols[k]=[...def,...cur.filter(c=>!NDEF[k].includes(c.name)&&c.name!=='TalkStartID')]; }
+  for(const n of d.npcs||[])if(n.x)delete n.x.TalkStartID; }
 function colModal(cur,save,del){
   const name=h('input',{type:'text',value:cur.name||'',style:'width:100%'});
   const type=h('select',{},[['text','텍스트'],['number','숫자'],['enum','선택 목록 (enum)']].map(([v,l])=>h('option',{value:v},l))); type.value=cur.type||'text';
@@ -560,14 +571,14 @@ function newTableModal(){
 let dbDrag=null;
 function dbTabList(){ // 데이터베이스 탭 목록. 표는 위치(t0, t1…)가 바뀌어도 순서가 유지되도록 고유 키(u:…)로 기억한다
   const items=[...NKL().map(([k,l])=>({k,l,n:db.npcs.filter(n=>(n.kind||'normal')===k).length,go:k})),
-    {k:'visits',l:'날짜별 방문자',n:db.visits.length,go:'visits'},{k:'lines',l:'대사',n:db.lines.length,go:'lines'},
+    {k:'visits',l:'날짜별 방문자',n:db.visits.length,go:'visits'},{k:'lines',l:'대사',n:db.lines.length,go:'lines'},{k:'events',l:'이벤트 목록',n:db.events.length,go:'events'},
     ...db.tables.map((t,i)=>{ if(!t.uid)t.uid='T'+Date.now().toString(36)+i+Math.random().toString(36).slice(2,6); return {k:'u:'+t.uid,l:t.name||'이름 없는 표',n:t.rows.length,go:'t'+i}; })];
   const ord=db.tabOrder||[], pos=it=>{const i=ord.indexOf(it.k);return i<0?1e6+items.indexOf(it):i;};
   return items.map(it=>[pos(it),it]).sort((a,b)=>a[0]-b[0]).map(x=>x[1]);
 }
 function dbView(){
   const isT=()=>/^t\d+$/.test(ui.dbTab);
-  if(!NK.some(k=>k[0]===ui.dbTab)&&ui.dbTab!=='visits'&&ui.dbTab!=='lines'&&!(isT()&&db.tables[+ui.dbTab.slice(1)]))ui.dbTab='normal';
+  if(!NK.some(k=>k[0]===ui.dbTab)&&ui.dbTab!=='visits'&&ui.dbTab!=='lines'&&ui.dbTab!=='events'&&!(isT()&&db.tables[+ui.dbTab.slice(1)]))ui.dbTab='normal';
   const kindOf=n=>n.kind||'normal';
   const list=dbTabList();
   const side=(e,el)=>{const r=el.getBoundingClientRect();return e.clientX>r.left+r.width/2;};
@@ -584,6 +595,7 @@ function dbView(){
     h('button',{class:'pri',onclick:()=>importCSV()},'+ CSV 불러오기'),h('button',{onclick:newTableModal},'+ 새 표 만들기'));
   if(isT())return h('div',{},tabs,tableView(+ui.dbTab.slice(1)));
   if(ui.dbTab==='visits'||ui.dbTab==='lines')return h('div',{},tabs,talkTable(ui.dbTab));
+  if(ui.dbTab==='events')return h('div',{},tabs,eventTable());
   const rows=db.npcs.filter(n=>kindOf(n)===ui.dbTab), ids=db.npcs.map(r=>r.id), dup=new Set(ids.filter((x,i)=>ids.indexOf(x)!==i));
   const xc=db.ncols[ui.dbTab]||(db.ncols[ui.dbTab]=[]);
   const addCol=()=>{const c={key:'c'+(db.nseq++),name:'새 열',type:'text',options:[]};xc.push(c);touch();render();colModal(c,o=>Object.assign(c,o),()=>xc.splice(xc.indexOf(c),1));};
@@ -760,6 +772,114 @@ function coordView(){
   return h('div',{class:'dlgwrap'},head,h('div',{class:'row',style:'margin-bottom:10px'},dateChips(ui.date)),h('div',{class:'coordwrap'},left,mapPane,right));
 }
 
+/* ---------- 대사 ID · 이벤트(강제 진행) ----------
+   대사 줄마다 고유 TalkID(240001~)를 붙여, 이벤트 표의 TalkStartID가 가리킬 수 있게 한다.
+   이벤트 대화는 대사 표의 NPC ID가 Event1, Event2 …인 묶음이고, 랜덤 손님에게 나눠주지 않는다. */
+const LINE_ID0=240001, EVENT_ID0=230001;
+function ensureLineIds(d){ if(!d||!Array.isArray(d.lines))return; let m=LINE_ID0-1; for(const l of d.lines)if(+l.id>m)m=+l.id; const seen=new Set();
+  for(const l of d.lines){ if(!(+l.id)||seen.has(+l.id))l.id=++m; else l.id=+l.id; seen.add(l.id); } }
+const PHASES=[['Prepare','영업 전'],['SongSelect','곡 선택'],['PreShow','영업 중'],['Closing','마감 후']];
+const phaseName=p=>(PHASES.find(x=>x[0]===p)||[p,'⚠ '+p])[1];
+const phaseIdx=p=>{const i=PHASES.findIndex(x=>x[0]===p);return i<0?9:i;};
+const evMin=e=>e.phase==='PreShow'&&e.minute!==''&&e.minute!=null?+e.minute:-1;
+const evSort=(a,b)=>dord(a.d)-dord(b.d)||phaseIdx(a.phase)-phaseIdx(b.phase)||evMin(a)-evMin(b)||(+a.order||0)-(+b.order||0);
+const eventsOf=k=>db.events.filter(e=>e.d===k).sort(evSort);
+const isEvtGrp=id=>/^Event\d+$/.test(String(id)), evtNo=id=>+String(id).slice(5)||0;
+const evtGroups=k=>[...new Set(db.lines.filter(l=>l.d===k&&isEvtGrp(l.npc)).map(l=>l.npc))].sort((a,b)=>evtNo(a)-evtNo(b));
+const lineById=id=>id===''||id==null?null:db.lines.find(l=>String(l.id)===String(id))||null;
+const dateIdOf=k=>(DM[k]&&DM[k].id)||dcode(k);
+const dkeyById=v=>{ v=String(v??'').trim(); return ALLDATES.find(k=>String(dateIdOf(k))===v)||dkeyOf(v); };
+const grpLabel=id=>isEvtGrp(id)?'이벤트 대화 '+evtNo(id):isGen(id)?'손님 '+genNo(id):npcOf(id)?(npcOf(id).name||id):String(id);
+const snippet=l=>isEv(l)?'〔'+evText(l)+'〕':(String(l.text||'').replace(/\\[A-Za-z]\[[^\]]*\]|\\./g,'').replace(/\s+/g,' ').trim().slice(0,22)||'(빈 대사)');
+function talkOpts(k){ // 같은 날짜의 대사 (이벤트 대화 먼저)
+  const ls=db.lines.filter(l=>l.d===k).sort((a,b)=>(isEvtGrp(b.npc)-isEvtGrp(a.npc))||(evtNo(a.npc)-evtNo(b.npc))||(a.npc<b.npc?-1:a.npc>b.npc?1:0)||byOrder(a,b));
+  return [['','(선택 안 함)'],...ls.map(l=>[String(l.id),l.id+' · '+grpLabel(l.npc)+' '+l.order+'번 · '+snippet(l)])]; }
+function newEvent(k,talk){ const id=Math.max(EVENT_ID0-1,...db.events.map(e=>+e.id||0))+1;
+  const e={id,code:'Event'+(id-EVENT_ID0+1),name:'',d:k,phase:'Prepare',minute:-1,order:db.events.filter(x=>x.d===k&&x.phase==='Prepare').length+1,talk:talk||'',memo:''};
+  db.events.push(e); return e; }
+function jumpEvent(e){ const l=lineById(e.talk); if(l){ openLine(l); return; } const i=dbTabList().findIndex(x=>x.k==='events'); ui.dbTab='events'; ui.date=e.d; closeModal(); go('db'); toast('연결된 첫 대사가 없어요. TalkStartID를 골라 주세요'); }
+function compactGen(k){ // 그날 랜덤 손님 칸을 방문 순서대로 Customer1, Customer2 …로 다시 번호 매긴다 (대사도 같이)
+  const gv=visitsOf(k).filter(v=>isGen(v.npc)), map={}; gv.forEach((v,i)=>{ if(v.npc!==GEN+(i+1))map[v.npc]=GEN+(i+1); });
+  if(!Object.keys(map).length)return;
+  const ls=db.lines.filter(l=>l.d===k&&map[l.npc]); gv.forEach(v=>{ if(map[v.npc])v.npc=map[v.npc]; }); ls.forEach(l=>{ l.npc=map[l.npc]; });
+  if(ui.date===k&&map[ui.vnpc])ui.vnpc=map[ui.vnpc]; }
+const genCount=k=>db.visits.filter(v=>v.d===k&&isGen(v.npc)).length;
+function guestChip(k){ const d=DM[k]||{}, n=genCount(k), g=d.guests, has=g!==''&&g!=null&&!isNaN(+g);
+  const over=has&&n>+g, left=has&&n<+g?+g-n:0;
+  return [h('span',{class:'tag'+(over?' pk':''),title:over?'랜덤 손님 대화가 예상 손님 수보다 많아요. 남는 대화는 쓰이지 않아요':''},'랜덤 손님 대화 '+n+'개 / 예상 일반 손님 '+(has?g+'명':'미입력')),
+    left?h('span',{class:'muted'},'남는 '+left+'명은 대화 없이 와요'):null]; }
+/* 대화 툴: 이벤트 칸 */
+function addEventHere(){ const k=ui.date, g='Event'+(Math.max(0,...evtGroups(k).map(evtNo))+1);
+  const l={d:k,npc:g,order:1,speaker:'player',face:'',text:''}; db.lines.push(l); ensureLineIds(db);
+  const e=newEvent(k,String(l.id)); ui.vnpc=g; ui.line=0; touch(); render(); toast('이벤트 '+e.id+'를 만들고 첫 대사를 연결했어요'); }
+function eventCol(k){
+  const evs=eventsOf(k), grps=evtGroups(k), linked=new Set(evs.map(e=>{const l=lineById(e.talk);return l&&l.d===k?l.npc:null;}).filter(Boolean)), loose=grps.filter(g=>!linked.has(g));
+  return h('div',{class:'panel',style:'margin-top:10px'},
+    h('div',{class:'row',style:'margin-bottom:6px'},h('h3',{class:'grow'},'이벤트 ('+evs.length+')'),h('button',{class:'sm pri',onclick:addEventHere},'+ 이벤트')),
+    evs.map(e=>{ const l=lineById(e.talk), ok=l&&l.d===k, on=ok&&l.npc===ui.vnpc;
+      return h('div',{class:'li'+(on?' on':''),onclick:()=>{ if(ok){ui.vnpc=l.npc;ui.line=Math.max(0,linesOf(k,l.npc).indexOf(l));render();} else jumpEvent(e); }},
+        h('span',{class:'tag',style:'background:#ffe89a;color:#6b5200;white-space:nowrap'},phaseName(e.phase)+(evMin(e)>=0?' '+evMin(e)+'분':'')),
+        h('div',{class:'grow'},e.name||e.code||String(e.id),h('small',{},e.id+' · 순서 '+e.order+' · '+(!l?'⚠ 첫 대사 없음':!ok?'⚠ 다른 날짜 대사':grpLabel(l.npc)+' '+l.order+'번부터'))) ); }),
+    loose.map(g=>h('div',{class:'li'+(g===ui.vnpc?' on':''),onclick:()=>{ui.vnpc=g;ui.line=0;render();}},h('span',{class:'tag'},'대화'),h('div',{class:'grow'},grpLabel(g),h('small',{},'연결된 이벤트 없음 · 대사 '+linesOf(k,g).length+'줄')))),
+    evs.length||loose.length?null:h('p',{class:'muted'},'이 날짜에는 이벤트가 없어요.'),
+    h('p',{class:'muted'},'시간 순서(시간대 → 분 → 순서)로 보여요. 누르면 연결된 첫 대사로 이동해요. 이벤트 대화는 랜덤 손님에게 나눠주지 않아요.'));
+}
+function evFields(e){ // 이벤트 한 줄의 입력칸 (대화 툴 · 이벤트 표 공용)
+  const minute=h('input',{type:'number',value:evMin(e),disabled:e.phase!=='PreShow',style:'width:70px',title:e.phase==='PreShow'?'영업 중 몇 분째에 시작 (-1 = 시작하자마자)':'영업 중일 때만 입력해요'});
+  minute.addEventListener('input',()=>{ e.minute=minute.value===''?-1:Math.max(-1,Math.round(+minute.value)); touch(); }); minute.addEventListener('change',render);
+  const order=h('input',{type:'number',value:e.order,min:1,style:'width:60px'}); order.addEventListener('input',()=>{ e.order=order.value===''?'':Math.max(1,Math.round(+order.value)); touch(); }); order.addEventListener('change',render);
+  return {phase:sel(PHASES,e.phase,v=>{ e.phase=v; if(v!=='PreShow')e.minute=-1; }),minute,order,talk:sel(talkOpts(e.d),String(e.talk??''),v=>e.talk=v,'max-width:320px')}; }
+function evEditPanel(who){
+  const evs=db.events.filter(e=>{const l=lineById(e.talk);return l&&l.d===ui.date&&l.npc===who;}).sort(evSort);
+  return h('div',{class:'panel',style:'margin-top:8px;background:#fffdf3'},
+    h('div',{class:'row'},h('span',{class:'tag',style:'background:#ffe89a;color:#6b5200'},'이벤트용'),h('span',{class:'muted grow'},'랜덤 손님에게 나눠주지 않는 대화예요. 마지막에 End 명령을 넣어야 강제 진행이 풀려요.')),
+    evs.length?evs.map(e=>{ const f=evFields(e); return h('div',{class:'row',style:'margin-top:8px'},
+        h('span',{class:'tag'},e.id),inp(e,'name',{ph:'이름',style:'width:140px'}),inp(e,'code',{ph:'CodeName',style:'width:120px'}),
+        h('label',{},'시간대 ',f.phase),h('label',{},'분 ',f.minute),h('label',{},'순서 ',f.order),h('label',{},'첫 대사 ',f.talk),inp(e,'memo',{ph:'메모',style:'width:160px'}),
+        h('button',{class:'sm ghost',title:'이벤트 삭제 (대사는 남아요)',onclick:()=>{snap();db.events.splice(db.events.indexOf(e),1);touch();render();toast('이벤트를 지웠어요 (대사는 남아 있어요)',true);}},'✕')); })
+      :h('div',{class:'row',style:'margin-top:8px'},h('span',{class:'muted'},'이 대화를 시작하는 이벤트가 없어요.'),h('button',{class:'sm',onclick:()=>{const L=linesOf(ui.date,who); newEvent(ui.date,L[0]?String(L[0].id):''); touch(); render();}},'+ 이 대화로 이벤트 만들기')));
+}
+/* 데이터베이스: 이벤트 목록 표 */
+const eventsCSV=()=>toCSV([['ID','CodeName','Name','DateID','Phase','Minute','Order','TalkStartID','Memo'],...[...db.events].sort(evSort).map(e=>[e.id,e.code||'',e.name||'',dateIdOf(e.d),e.phase,evMin(e),e.order,e.talk??'',NL(e.memo)])]);
+function importEventsCSV(){ pickFile('.csv,text/csv','csv',text=>{ const rows=csvParse(text).filter(r=>r.some(c=>String(c).trim()!=='')).slice(1); let bad=0; const out=[];
+  for(const r of rows){ const d=dkeyById(r[3]); if(!d||!(+r[0])){bad++;continue;} const ph=PHASES.some(p=>p[0]===String(r[4]).trim())?String(r[4]).trim():'Prepare';
+    out.push({id:+r[0],code:String(r[1]??'').trim(),name:String(r[2]??'').trim(),d,phase:ph,minute:ph==='PreShow'&&String(r[5]??'').trim()!==''?+r[5]:-1,order:+r[6]||1,talk:String(r[7]??'').trim(),memo:String(r[8]??'').replace(/\\n/g,'\n')}); }
+  snap(); db.events=out; touch(); render(); toast(out.length+'개를 불러왔어요'+(bad?' · 건너뛴 줄 '+bad+'개':''),true); }); }
+function eventTable(){
+  let rows=[...db.events].sort(evSort); const all=rows.length; if(ui.date)rows=rows.filter(e=>e.d===ui.date);
+  const dateOpts=ALLDATES.map(k=>[k,dateIdOf(k)+' · '+dlw(k)]);
+  const head=['ID','CodeName','Name','DateID','Phase','Minute','Order','TalkStartID','Memo','',''];
+  return h('div',{class:'panel'},
+    h('div',{class:'row',style:'margin-bottom:8px'},h('h3',{},'이벤트 목록'),
+      h('span',{class:'muted grow'},ui.date?dcode(ui.date)+'만 보는 중 ('+rows.length+' / 전체 '+all+'개)':'전체 '+all+'개 · 날짜 → 시간대 → 분 → 순서로 정렬돼요'),
+      h('button',{class:'sm',onclick:importEventsCSV},'CSV 불러오기 (덮어쓰기)'),
+      h('button',{class:'sm',onclick:()=>saveFile(exportFiles().dlg.find(f=>f.key==='events').file+'.csv','﻿'+eventsCSV())},'CSV 내보내기')),
+    h('div',{class:'gridwrap','data-sc':'tbl'},h('table',{class:'grid'},h('tr',{},head.map(x=>h('th',{style:'padding:4px 8px'},x))),
+      rows.map(e=>{ const f=evFields(e), idIn=h('input',{type:'number',value:e.id,style:'min-width:90px'}); idIn.addEventListener('change',()=>{e.id=+idIn.value||e.id;touch();render();});
+        return h('tr',{},h('td',{},idIn),h('td',{},inp(e,'code')),h('td',{},inp(e,'name')),h('td',{},sel(dateOpts,e.d,v=>{e.d=v;const l=lineById(e.talk);if(l&&l.d!==v)e.talk='';})),
+          h('td',{},f.phase),h('td',{},f.minute),h('td',{},f.order),h('td',{},f.talk),h('td',{},inp(e,'memo',{style:'min-width:180px'})),
+          h('td',{},h('button',{class:'sm',title:'연결된 첫 대사로 이동',onclick:()=>jumpEvent(e)},'이동')),
+          h('td',{},h('button',{class:'sm ghost',title:'행 삭제',onclick:()=>{snap();db.events.splice(db.events.indexOf(e),1);touch();render();toast('이벤트를 지웠어요',true);}},'✕'))); }))),
+    h('div',{class:'row',style:'margin-top:8px'},h('button',{class:'pri sm',onclick:()=>{newEvent(ui.date||ALLDATES[0],'');touch();render();}},'+ 행 추가'),
+      h('span',{class:'muted'},'Phase는 한글로 보이고 CSV에는 영어로 나가요. Minute는 영업 중(PreShow)일 때만 입력돼요(-1 = 시작하자마자). TalkStartID는 같은 날짜의 대사 중에서 골라요.')));
+}
+/* 명령: WaitAction · End */
+const ACTDEF=['MakeDrink','ServeDrink','SelectSong','PlacePlant'];
+const actions=()=>db.actions||(db.actions=[...ACTDEF]);
+function actModal(){ const ta=h('textarea',{value:actions().join('\n'),style:'height:180px'});
+  modal('행동 이름 (WaitAction)',h('div',{},h('p',{class:'muted'},'한 줄에 하나씩 적어요. 영어 그대로 대사 CSV의 Command 칸에 WaitAction:이름 으로 나가요. 이미 쓴 이름을 지우면 그 줄은 ⚠로 표시돼요.'),ta),
+    [h('button',{onclick:closeModal},'취소'),h('button',{class:'pri',onclick:()=>{db.actions=[...new Set(ta.value.split('\n').map(x=>x.trim().replace(/\s+/g,'')).filter(Boolean))];closeModal();touch();render();}},'저장')]); }
+/* 검사: 이벤트 */
+function eventReport(){ const R=[], key={};
+  for(const e of db.events){ const l=lineById(e.talk);
+    if(e.talk===''||e.talk==null)R.push({e,msg:'TalkStartID가 비어 있어요'});
+    else if(!l)R.push({e,msg:'TalkStartID '+e.talk+'인 대사가 없어요'});
+    else{ if(l.d!==e.d)R.push({e,msg:'이벤트 날짜('+dcode(e.d)+')와 첫 대사 날짜('+dcode(l.d)+')가 달라요'});
+      if(!linesOf(l.d,l.npc).filter(x=>+x.order>=+l.order).some(x=>x.cmd==='End'))R.push({e,msg:'첫 대사부터 끝까지 End 명령이 없어요 (강제 진행이 안 풀려요)'}); }
+    const k=[e.d,e.phase,evMin(e),e.order].join('|'); (key[k]=key[k]||[]).push(e); }
+  for(const k in key) if(key[k].length>1) R.push({e:key[k][0],msg:'날짜·시간대·분·순서가 같은 이벤트가 있어요: '+key[k].map(x=>x.id).join(', ')});
+  return R; }
+
 /* ---------- 대화 툴 (날짜 → 방문자 → 대사) ---------- */
 const MNAME={0:'Demo',4:'April',6:'June',7:'July',8:'August'};
 const dcode=k=>(DM[k]&&DM[k].code)||(()=>{const [m,d]=String(k).split('-');return (MNAME[m]||('M'+m))+d;})(); // 날짜ID (April5, June1 …)
@@ -801,41 +921,41 @@ function showTip(el){ const t=$('#tip'); t.innerHTML='<div style="margin-bottom:
   t.style.display='block'; const r=el.getBoundingClientRect(), th=t.offsetHeight; t.style.left=Math.max(8,Math.min(r.left,innerWidth-350))+'px'; t.style.top=(r.bottom+th+8<innerHeight?r.bottom+6:Math.max(8,r.top-th-6))+'px'; }
 function hideTip(){ clearTimeout(showTip.t); $('#tip').style.display='none'; }
 function dialogView(){
-  if(!ui.date){ const ds=[...new Set(db.visits.map(v=>v.d))].sort((a,b)=>dord(a)-dord(b));
+  if(!ui.date){ const ds=[...new Set([...db.visits,...db.events].map(v=>v.d))].sort((a,b)=>dord(a)-dord(b));
     return h('div',{class:'panel'},h('h2',{},'대화 툴'),h('p',{},'왼쪽 달력에서 날짜를 누르면 그날 방문자와 대사를 쓸 수 있어요.'),
-      ds.length?h('div',{class:'row'},h('span',{class:'muted'},'방문자가 있는 날짜'),ds.map(k=>h('button',{class:'sm',onclick:()=>{ui.date=k;render();}},dlw(k)))):null); }
-  const vs=visitsOf(ui.date); if(!vs.some(v=>v.npc===ui.vnpc)){ui.vnpc=vs[0]?vs[0].npc:null;ui.line=0;}
+      ds.length?h('div',{class:'row'},h('span',{class:'muted'},'방문자·이벤트가 있는 날짜'),ds.map(k=>h('button',{class:'sm',onclick:()=>{ui.date=k;render();}},dlw(k)))):null); }
+  const vs=visitsOf(ui.date), eg=evtGroups(ui.date); if(!vs.some(v=>v.npc===ui.vnpc)&&!eg.includes(ui.vnpc)){ui.vnpc=vs[0]?vs[0].npc:(eg[0]||null);ui.line=0;}
   return h('div',{class:'dlgwrap'},h('div',{class:'row',style:'margin-bottom:10px'},h('h2',{},dlw(ui.date)),h('span',{class:'tag sky',title:'날짜ID'},dcode(ui.date)),dateChips(ui.date)),
-    h('div',{class:'dlg'},visitCol(vs),editCol(),previewCol()));
+    h('div',{class:'dlg'},h('div',{'data-sc':'list'},visitCol(vs),eventCol(ui.date)),editCol(),previewCol()));
 }
 function visitCol(vs){
   const has=id=>vs.some(v=>v.npc===id), rest=[['__gen','손님 (랜덤) 1명 추가'],...talkers().filter(n=>!has(n.id)).map(n=>[n.id,'['+kindTag(n)+'] '+(n.name||n.id)+' ('+n.id+')'])];
   const pick=h('select',{style:'flex:1;min-width:0'},rest.map(([v,l])=>h('option',{value:v},l)));
   const cnt=k=>db.npcs.filter(n=>n.kind===k).length;
-  const move=(i,dir)=>{const j=i+dir;if(j<0||j>=vs.length)return;[vs[i],vs[j]]=[vs[j],vs[i]];renum(vs);touch();render();};
-  return h('div',{class:'panel','data-sc':'list'},
-    h('div',{class:'row',style:'margin-bottom:6px'},h('h3',{class:'grow'},'방문자 ('+vs.length+')')),
+  const move=(i,dir)=>{const j=i+dir;if(j<0||j>=vs.length)return;[vs[i],vs[j]]=[vs[j],vs[i]];renum(vs);compactGen(ui.date);touch();render();};
+  return h('div',{class:'panel'},
+    h('div',{class:'row',style:'margin-bottom:6px'},h('h3',{class:'grow'},'방문자 ('+vs.length+')')),h('div',{class:'row',style:'margin-bottom:6px'},guestChip(ui.date)),
     vs.map((v,i)=>h('div',{class:'li'+(v.npc===ui.vnpc?' on':''),onclick:e=>{ if(e.target.closest('button'))return; ui.vnpc=v.npc;ui.line=0;render(); }},
       h('span',{class:'tag'},i+1),
       h('div',{class:'grow'},isGen(v.npc)?'손님 '+(genNo(v.npc)||''):npcOf(v.npc)?(npcOf(v.npc).name||v.npc):'⚠ 없는 NPC',h('small',{},(isGen(v.npc)?'랜덤 · '+v.npc:npcOf(v.npc)?kindTag(npcOf(v.npc))+' · '+v.npc:v.npc)+' · 대사 '+linesOf(ui.date,v.npc).length+'줄')),
       h('button',{class:'sm ghost',title:'순서 위로',onclick:()=>move(i,-1)},'↑'),h('button',{class:'sm ghost',title:'순서 아래로',onclick:()=>move(i,1)},'↓'),
-      h('button',{class:'sm ghost',title:'이 날 방문에서 빼기',onclick:()=>{snap();db.visits.splice(db.visits.indexOf(v),1);db.lines=db.lines.filter(l=>!(l.d===ui.date&&l.npc===v.npc));renum(visitsOf(ui.date));touch();render();toast('방문자와 그날 대사를 지웠어요',true);}},'✕'))),
+      h('button',{class:'sm ghost',title:'이 날 방문에서 빼기',onclick:()=>{snap();db.visits.splice(db.visits.indexOf(v),1);db.lines=db.lines.filter(l=>!(l.d===ui.date&&l.npc===v.npc));renum(visitsOf(ui.date));compactGen(ui.date);touch();render();toast('방문자와 그날 대사를 지웠어요',true);}},'✕'))),
     vs.length?null:h('p',{class:'muted'},'이 날짜에는 아직 방문자가 없어요.'),
-    rest.length?h('div',{class:'row',style:'margin-top:8px'},pick,h('button',{class:'pri sm',onclick:()=>{const id=pick.value==='__gen'?GEN+(Math.max(0,...vs.filter(v=>isGen(v.npc)).map(v=>genNo(v.npc)))+1):pick.value;db.visits.push({d:ui.date,npc:id,order:vs.length+1});ui.vnpc=id;ui.line=0;touch();render();}},'+ 방문자')):
+    rest.length?h('div',{class:'row',style:'margin-top:8px'},pick,h('button',{class:'pri sm',onclick:()=>{const id=pick.value==='__gen'?GEN+(Math.max(0,...vs.filter(v=>isGen(v.npc)).map(v=>genNo(v.npc)))+1):pick.value;db.visits.push({d:ui.date,npc:id,order:vs.length+1});ui.vnpc=id;compactGen(ui.date);ui.line=0;touch();render();}},'+ 방문자')):
       h('p',{class:'muted'},'고를 수 있는 방문자가 모두 들어 있어요.'),
     h('p',{class:'muted'},'고를 수 있는 방문자: 손님(랜덤, 여러 명 가능) · 밴드멤버 '+cnt('band')+'명 · 특별손님 '+cnt('special')+'명 · 지금 손님 '+vs.filter(v=>isGen(v.npc)).length+'명'));
 }
 function editCol(){
   const L=curLines();
   if(!L) return h('div',{class:'panel'},h('p',{class:'muted'},'왼쪽에서 방문자를 추가하거나 골라 주세요.'));
-  const who=ui.vnpc, me=isGen(who)?GEN:who, others=talkers().filter(n=>n.id!==who);
-  const spOpts=[[me,npcLabel(me)],['player','플레이어 (player)'],...(me===GEN?[]:[[GEN,npcLabel(GEN)]]),...others.map(n=>[n.id,npcLabel(n.id)])];
+  const who=ui.vnpc, isE=isEvtGrp(who), me=isE?'player':isGen(who)?GEN:who, others=talkers().filter(n=>n.id!==who);
+  const spOpts=isE?[['player','플레이어 (player)'],[GEN,npcLabel(GEN)],...talkers().map(n=>[n.id,npcLabel(n.id)])]:[[me,npcLabel(me)],['player','플레이어 (player)'],...(me===GEN?[]:[[GEN,npcLabel(GEN)]]),...others.map(n=>[n.id,npcLabel(n.id)])];
   const select=i=>{ if(ui.line!==i){ui.line=i;document.querySelectorAll('.line').forEach((e,j)=>e.classList.toggle('on',j===i));pvLoad(true);} };
   const cards=L.map((l,i)=>{
     if(isEv(l)){ const ev=evOf(l), mvE=dir=>{const j=i+dir;if(j<0||j>=L.length)return;[L[i],L[j]]=[L[j],L[i]];renum(L);ui.line=j;touch();render();};
       const arg=ev.param==='none'?null:inp(l,'arg',{type:ev.param==='number'?'number':'text',ph:ev.param==='tile'?'x,y':ev.param==='number'?'숫자':'값 (예: 컷씬 ID)',style:'width:170px',oninput:()=>{ui.line=i;pvLoad(true);}});
       return h('div',{class:'line ev'+(ui.line===i?' on':''),onclick:e=>{ if(!e.target.closest('button,select'))select(i); }},
-        h('div',{class:'hd',style:'margin-bottom:0'},h('span',{class:'tag',title:'순서'},i+1),h('span',{class:'tag',style:'background:#ffe89a;color:#6b5200'},'연출'),
+        h('div',{class:'hd',style:'margin-bottom:0'},h('span',{class:'tag',title:'순서'},i+1),h('span',{class:'tag',style:'background:#ffe89a;color:#6b5200'},'연출'),h('span',{class:'muted',title:'TalkID'},'#'+l.id),
           sel(evTypes().map(e=>[e.id,e.name]),l.type,v=>{l.type=v;ui.line=i;}),
           h('span',{class:'muted'},'대상'),sel(spOpts,l.speaker,v=>{l.speaker=v;ui.line=i;}),
           arg,ev.param==='tile'?h('button',{class:'sm',onclick:()=>{ui.line=i;pickTile(v=>{l.arg=v;});}},'맵에서 고르기'):null,
@@ -851,7 +971,7 @@ function editCol(){
     const mv=dir=>{const j=i+dir;if(j<0||j>=L.length)return;[L[i],L[j]]=[L[j],L[i]];renum(L);ui.line=j;touch();render();};
     check();
     return h('div',{class:'line'+(ui.line===i?' on':''),onclick:e=>{ if(!e.target.closest('button,select'))select(i); }},
-      h('div',{class:'hd'},h('span',{class:'tag',title:'순서'},i+1),
+      h('div',{class:'hd'},h('span',{class:'tag',title:'순서'},i+1),h('span',{class:'muted',title:'TalkID (이벤트의 TalkStartID가 가리키는 번호)'},'#'+l.id),
         sel(spOpts,l.speaker,v=>{l.speaker=v;l.face=facesOf(v)[0]||'';ui.line=i;}),
         l.speaker==='player'?null:sel(facesOf(l.speaker),l.face,v=>{l.face=v;ui.line=i;}),
         h('span',{class:'grow'}),
@@ -860,9 +980,9 @@ function editCol(){
       ta,h('div',{class:'row',style:'margin-top:6px'},h('span',{class:'tag'+(l.cmd?' sky':'')},'명령'),cmdSel(l)),warn);
   });
   return h('div',{'data-sc':'edit'},
-    h('div',{class:'panel'},h('div',{class:'row'},h('h3',{},npcLabel(who)),h('span',{class:'muted grow'},dlw(ui.date)+' · 대사 '+L.length+'줄 · 대사와 연출이 위에서부터 순서대로 재생돼요'))),
+    h('div',{class:'panel'},h('div',{class:'row'},h('h3',{},isE?grpLabel(who)+' ('+who+')':npcLabel(who)),h('span',{class:'muted grow'},dlw(ui.date)+' · 대사 '+L.length+'줄 · 대사와 연출이 위에서부터 순서대로 재생돼요')),isE?evEditPanel(who):null),
     cards,
-    h('div',{style:'margin:10px 0 30px'},h('button',{class:'pri',onclick:()=>{const last=L[L.length-1],sp=last?last.speaker:me;db.lines.push({d:ui.date,npc:who,order:L.length+1,speaker:sp,face:last&&last.speaker===sp?last.face:(facesOf(sp)[0]||''),text:''});ui.line=L.length;touch();render();}},'+ 줄 추가'),' ',h('button',{onclick:()=>{db.lines.push({d:ui.date,npc:who,order:L.length+1,type:(evTypes()[0]||{id:'Walk'}).id,arg:'',speaker:me,face:'',text:''});ui.line=L.length;touch();render();}},'+ 연출 추가'),' ',h('button',{class:'ghost',onclick:evModal},'연출 종류 관리')));
+    h('div',{style:'margin:10px 0 30px'},h('button',{class:'pri',onclick:()=>{const last=L[L.length-1],sp=last?last.speaker:me;db.lines.push({d:ui.date,npc:who,order:L.length+1,speaker:sp,face:last&&last.speaker===sp?last.face:(facesOf(sp)[0]||''),text:''});ui.line=L.length;touch();render();}},'+ 줄 추가'),' ',h('button',{onclick:()=>{db.lines.push({d:ui.date,npc:who,order:L.length+1,type:(evTypes()[0]||{id:'Walk'}).id,arg:'',speaker:me,face:'',text:''});ui.line=L.length;touch();render();}},'+ 연출 추가'),' ',h('button',{class:'ghost',onclick:evModal},'연출 종류 관리'),h('button',{class:'ghost',onclick:actModal},'행동 이름 관리')));
 }
 
 /* ---------- 방문자 · 대사 표 (데이터베이스 탭) ---------- */
@@ -870,20 +990,20 @@ const sortedVisits=()=>[...db.visits].sort((a,b)=>dord(a.d)-dord(b.d)||byOrder(a
 const sortedLines=()=>{ const vo={}; db.visits.forEach(v=>vo[v.d+'|'+v.npc]=+v.order||0); return [...db.lines].sort((a,b)=>dord(a.d)-dord(b.d)||((vo[a.d+'|'+a.npc]||999)-(vo[b.d+'|'+b.npc]||999))||(a.npc<b.npc?-1:a.npc>b.npc?1:0)||byOrder(a,b)); };
 const NL=s=>String(s??'').replace(/\r?\n/g,'\\n'); // CSV 한 줄 = 대사 한 줄이 되도록 줄바꿈은 \n 글자로 내보낸다
 const visitsCSV=()=>toCSV([['날짜ID','NPC ID','방문 순서'],...sortedVisits().map(v=>[dcode(v.d),v.npc,v.order])]);
-const linesCSV=()=>toCSV([['날짜ID','NPC ID','순서','화자 ID','표정','대사 텍스트','종류','연출 값','Command'],...sortedLines().map(l=>[dcode(l.d),l.npc,l.order,l.speaker,isEv(l)||l.speaker==='player'?'':(l.face||''),isEv(l)?'':NL(l.text),isEv(l)?l.type:'Talk',isEv(l)?(l.arg??''):'',l.cmd||''])]);
+const linesCSV=()=>toCSV([['날짜ID','NPC ID','순서','화자 ID','표정','대사 텍스트','종류','연출 값','Command','TalkID'],...sortedLines().map(l=>[dcode(l.d),l.npc,l.order,l.speaker,isEv(l)||l.speaker==='player'?'':(l.face||''),isEv(l)?'':NL(l.text),isEv(l)?l.type:'Talk',isEv(l)?(l.arg??''):'',l.cmd||'',l.id])]);
 function importTalkCSV(which){
   pickFile('.csv,text/csv','csv',text=>{ const rows=csvParse(text).filter(r=>r.some(c=>String(c).trim()!=='')).slice(1); let bad=0; const out=[];
     for(const r of rows){ const d=dkeyOf(r[0]); if(!d||!String(r[1]||'').trim()){bad++;continue;}
-      out.push(which==='visits'?{d,npc:String(r[1]).trim(),order:+r[2]||out.length+1}:{d,npc:String(r[1]).trim(),order:+r[2]||out.length+1,speaker:String(r[3]||r[1]).trim(),face:String(r[4]||'').trim(),text:String(r[5]??'').replace(/\\n/g,'\n'),type:String(r[6]||'').trim()==='Talk'?'':String(r[6]||'').trim(),arg:String(r[7]??'').trim(),...(String(r[8]??'').trim()?{cmd:String(r[8]).trim()}:{})}); }
+      out.push(which==='visits'?{d,npc:String(r[1]).trim(),order:+r[2]||out.length+1}:{d,npc:String(r[1]).trim(),order:+r[2]||out.length+1,speaker:String(r[3]||r[1]).trim(),face:String(r[4]||'').trim(),text:String(r[5]??'').replace(/\\n/g,'\n'),type:String(r[6]||'').trim()==='Talk'?'':String(r[6]||'').trim(),arg:String(r[7]??'').trim(),...(String(r[8]??'').trim()?{cmd:String(r[8]).trim()}:{}),...(+r[9]?{id:+r[9]}:{})}); }
     snap(); db[which]=out; touch(); render(); toast(out.length+'행을 불러왔어요'+(bad?' · 날짜ID를 못 찾아 건너뛴 줄 '+bad+'개':''),true); });
 }
 function talkTable(which){
-  const dateOpts=ALLDATES.map(k=>[k,dcode(k)]), gens=[...new Set([...db.visits,...db.lines].map(x=>x.npc).filter(isGen))].sort((a,b)=>genNo(a)-genNo(b)), npcIds=[...gens,GEN+(Math.max(0,...gens.map(genNo))+1),...talkers().map(n=>n.id)], spIds=['player',GEN,...talkers().map(n=>n.id)], isV=which==='visits';
+  const dateOpts=ALLDATES.map(k=>[k,dcode(k)]), gens=[...new Set([...db.visits,...db.lines].map(x=>x.npc).filter(isGen))].sort((a,b)=>genNo(a)-genNo(b)), egs=[...new Set(db.lines.map(x=>x.npc).filter(isEvtGrp))].sort((a,b)=>evtNo(a)-evtNo(b)), npcIds=[...gens,GEN+(Math.max(0,...gens.map(genNo))+1),...talkers().map(n=>n.id),...(isV?[]:[...egs,'Event'+(Math.max(0,...egs.map(evtNo))+1)])], spIds=['player',GEN,...talkers().map(n=>n.id)], isV=which==='visits';
   let rows=isV?sortedVisits():sortedLines(); const all=rows.length; if(ui.date)rows=rows.filter(r=>r.d===ui.date);
   const del=r=>h('button',{class:'sm ghost',title:'행 삭제',onclick:()=>{snap();db[which].splice(db[which].indexOf(r),1);touch();render();toast('행을 삭제했어요',true);}},'✕');
   const num=r=>{const e=h('input',{type:'number',value:r.order,style:'min-width:60px'});e.addEventListener('input',()=>{r.order=e.value===''?'':+e.value;touch();});e.addEventListener('change',render);return e;};
   const txt=r=>{const e=h('input',{type:'text',value:r.text,style:'min-width:360px'});e.addEventListener('input',()=>{r.text=e.value;touch();});return e;};
-  const head=isV?['날짜ID','NPC ID','방문 순서']:['날짜ID','NPC ID','순서','화자 ID','표정','대사 텍스트','종류','연출 값','Command'];
+  const head=isV?['날짜ID','NPC ID','방문 순서']:['날짜ID','NPC ID','순서','화자 ID','표정','대사 텍스트','종류','연출 값','Command','TalkID'];
   const argIn=r=>{const e=h('input',{type:'text',value:r.arg??'',style:'min-width:110px'});e.addEventListener('input',()=>{r.arg=e.value;touch();});return e;};
   return h('div',{class:'panel'},
     h('div',{class:'row',style:'margin-bottom:8px'},h('h3',{},isV?'날짜별 방문자':'대사'),
@@ -892,11 +1012,11 @@ function talkTable(which){
       h('button',{class:'sm',onclick:()=>saveFile(exportFiles()[isV?'date':'dlg'].find(f=>f.key===which).file+'.csv','﻿'+(isV?visitsCSV():linesCSV()))},'CSV 내보내기')),
     h('div',{class:'gridwrap','data-sc':'tbl'},h('table',{class:'grid'},h('tr',{},head.map(x=>h('th',{style:'padding:4px 8px'},x)),h('th',{},'')),
       rows.map(r=>h('tr',{},h('td',{},sel(dateOpts,r.d,v=>r.d=v)),h('td',{},sel(npcIds,r.npc,v=>r.npc=v)),h('td',{},num(r)),
-        isV?null:[h('td',{},sel(spIds,r.speaker,v=>{r.speaker=v;if(!facesOf(v).includes(r.face))r.face=facesOf(v)[0]||'';})),h('td',{},r.speaker==='player'?'':sel(facesOf(r.speaker),r.face,v=>r.face=v)),h('td',{},txt(r)),h('td',{},sel([['','Talk'],...evTypes().map(e=>[e.id,e.id])],isEv(r)?r.type:'',v=>r.type=v)),h('td',{},isEv(r)?argIn(r):''),h('td',{},cmdSel(r))],
+        isV?null:[h('td',{},sel(spIds,r.speaker,v=>{r.speaker=v;if(!facesOf(v).includes(r.face))r.face=facesOf(v)[0]||'';})),h('td',{},r.speaker==='player'?'':sel(facesOf(r.speaker),r.face,v=>r.face=v)),h('td',{},txt(r)),h('td',{},sel([['','Talk'],...evTypes().map(e=>[e.id,e.id])],isEv(r)?r.type:'',v=>r.type=v)),h('td',{},isEv(r)?argIn(r):''),h('td',{},cmdSel(r)),h('td',{class:'muted',style:'padding:0 8px'},r.id)],
         h('td',{},del(r)))))),
     h('div',{class:'row',style:'margin-top:8px'},h('button',{class:'pri sm',onclick:()=>{ const d=ui.date||ALLDATES[0], npc=npcIds[0]||''; if(!npc){toast('NPC를 먼저 추가해 주세요');return;}
         if(isV)db.visits.push({d,npc,order:visitsOf(d).length+1}); else db.lines.push({d,npc,order:linesOf(d,npc).length+1,speaker:isGen(npc)?GEN:npc,face:facesOf(npc)[0]||'',text:''}); touch();render(); }},'+ 행 추가'),
-      h('span',{class:'muted'},isV?'날짜ID와 NPC ID는 드롭다운으로만 골라요. 대화 툴에서 방문자를 추가하면 여기에 쌓입니다.':'대화 툴에서 쓴 대사가 여기에 한 줄씩 쌓여요. 긴 대사는 대화 툴에서 고치는 게 편해요.')));
+      h('span',{class:'muted'},isV?'날짜ID와 NPC ID는 드롭다운으로만 골라요. 대화 툴에서 방문자를 추가하면 여기에 쌓입니다.':'대화 툴에서 쓴 대사가 여기에 한 줄씩 쌓여요. NPC ID가 Customer1·2…면 그날 몇 번째 랜덤 손님 대화, Event1·2…면 이벤트용 대화예요. TalkID는 자동으로 붙어요.')));
 }
 
 /* ---------- 미리보기 ---------- */
@@ -1035,7 +1155,8 @@ function unityExport(){
   return {npcs:db.npcs.map(n=>({id:n.id,unityId:n.num||'',name:n.name,category:n.kind||'normal',portraits:facesOf(n.id),extra:((db.ncols||{})[n.kind||'normal']||[]).map(c=>({name:c.name,value:String((n.x||{})[c.key]??'')}))})),
     tables:db.tables.map(t=>({name:t.name,kind:t.kind||'',columns:t.cols,rows:t.rows.map(r=>({cells:r.map(c=>String(c??''))}))})),
     visitors:sortedVisits().map(v=>({dateId:dcode(v.d),npcId:v.npc,order:+v.order||0})),
-    dialogues:sortedLines().map(l=>({dateId:dcode(l.d),npcId:l.npc,order:+l.order||0,type:isEv(l)?l.type:'Talk',arg:isEv(l)?String(l.arg??''):'',speakerId:l.speaker,portrait:l.speaker==='player'?'':(l.face||''),text:isEv(l)?'':(l.text||''),command:l.cmd||''})),
+    events:[...db.events].sort(evSort).map(e=>({id:+e.id,codeName:e.code||'',name:e.name||'',dateId:String(dateIdOf(e.d)),phase:e.phase,minute:evMin(e),order:+e.order||0,talkStartId:+e.talk||0,memo:e.memo||''})),
+    dialogues:sortedLines().map(l=>({talkId:+l.id,dateId:dcode(l.d),npcId:l.npc,order:+l.order||0,type:isEv(l)?l.type:'Talk',arg:isEv(l)?String(l.arg??''):'',speakerId:l.speaker,portrait:l.speaker==='player'?'':(l.face||''),text:isEv(l)?'':(l.text||''),command:l.cmd||''})),
     npcSpawns:Object.keys(db.coord.daily).flatMap(k=>Object.keys(db.coord.daily[k]).flatMap(sid=>Object.keys(db.coord.daily[k][sid]).map(c=>{const o=db.coord.daily[k][sid][c],p=kxy(c);return Object.assign(date(k),{slot:sid,npcId:o.npc||'',name:cname(o),x:p.x,y:p.y});}))),
     fixedNpcs:Object.keys(db.coord.fixed).map(c=>{const f=db.coord.fixed[c],p=kxy(c);return {npcId:f.npc||'',name:cname(f),x:p.x,y:p.y,slots:f.slots||SLOTS.map(x=>x[0]),exceptDates:(f.except||[]).map(date)};})};
 }
@@ -1059,7 +1180,7 @@ function zipStore(files){ // 무압축 ZIP (UTF-8 파일명)
   return new Blob([...parts,...cen,new Uint8Array(e.buffer)],{type:'application/zip'});
 }
 const NFILE={normal:'DataNpcCustomer',special:'DataNpcCustomerSpecial',band:'DataNpcBandMember',talk:'DataNpc'};
-const XFILE={spawn:'NpcSpawnByDate',fixed:'NpcSpawnFixed',visits:'DateVisitor',lines:'Dialogue'};
+const XFILE={spawn:'NpcSpawnByDate',fixed:'NpcSpawnFixed',visits:'DateVisitor',lines:'Dialogue',events:'EventDataTable'};
 const fclean=n=>String(n||'').replace(/\.csv$/i,'').replace(/[\\/:*?"<>|]+/g,'_').trim();
 function npcCSV(kind){ const xc=db.ncols[kind]||[], on=!!(db.nunlock||{})[kind]; return toCSV([['ID','CodeName','Name',...(on?UL.map(u=>u.name):[]),...xc.map(c=>c.name),'Portraits'],...db.npcs.filter(n=>(n.kind||'normal')===kind).map(n=>[n.num||'',n.id,n.name,...(on?UL.map(u=>(n.ul||{})[u.name]||''):[]),...xc.map(c=>(n.x||{})[c.key]??''),facesOf(n.id).join('|')])]); }
 function spawnCSV(){ const S=db.coord, R=[['월','일','요일','DateID','시간대','NpcID','CodeName','Name','X','Y']], code=o=>o.npc&&npcOf(o.npc)?(npcOf(o.npc).num||''):'';
@@ -1071,7 +1192,7 @@ function exportFiles(){ // 표시 이름(label)과 내보내기 파일 이름(fi
   const it=(label,obj,key,def,text)=>({key,label,def,text,raw:()=>obj[key]??'',set:v=>{obj[key]=v;},get file(){return fclean(obj[key])||def;}});
   return {db:[...NKL().map(([k,l])=>it(l,db.nfile,k,NFILE[k],npcCSV(k))),...db.tables.filter(t=>t.kind!=='date').map(t=>it(t.name||'이름 없는 표',t,'file',fclean(t.name)||'table',toCSV([t.cols,...t.rows])))],
     date:[...db.tables.filter(t=>t.kind==='date').map(t=>it(t.name||'날짜',t,'file','DateDataTable',toCSV([t.cols,...t.rows]))),it('날짜별 방문자',db.xfile,'visits',XFILE.visits,visitsCSV()),it('날짜별 NPC 배치',db.xfile,'spawn',XFILE.spawn,spawnCSV()),it('고정 NPC',db.xfile,'fixed',XFILE.fixed,fixedCSV())],
-    dlg:[it('대사',db.xfile,'lines',XFILE.lines,linesCSV())]};
+    dlg:[it('대사',db.xfile,'lines',XFILE.lines,linesCSV()),it('이벤트 목록',db.xfile,'events',XFILE.events,eventsCSV())]};
 }
 function zipOf(groups){ const enc=new TextEncoder(), used={};
   return zipStore(groups.flatMap(([dir,fs])=>fs.map(f=>{ let base=f.name?f.name.replace(/\.[^.]+$/,''):f.file, ext=f.name?f.name.slice(base.length):'.csv', n=(dir?dir+'/':'')+base, r=n, i=2; while(used[r+ext])r=n+'_'+(i++); used[r+ext]=1;
@@ -1085,7 +1206,7 @@ function exportModal(){
       h('p',{class:'muted'},'왼쪽은 표시 이름, 입력칸은 내보낼 파일 이름이에요. 비워 두면 회색으로 보이는 기본 이름을 씁니다.'),
       sec('데이터베이스 — 손님 4분류 + 내가 만든 표',F.db,'database'),
       sec('날짜 데이터 — 날짜 표 + 날짜별 방문자 + 좌표 툴의 NPC 배치',F.date,'date'),
-      sec('대사',F.dlg,'dialogue'),
+      sec('대사 · 이벤트',F.dlg,'dialogue'),
       h('div',{class:'sec'},h('h4',{},'기타'),h('div',{class:'row'},h('button',{class:'sm',onclick:()=>saveFile(nm+'_unity.json',JSON.stringify(unityExport(),null,2))},'Unity JSON 받기')))),
     h('button',{class:'pri',onclick:()=>saveFile(nm+'_all.zip',zipOf([['database',F.db],['date',F.date],['dialogue',F.dlg],['',[{name:'unity.json',text:JSON.stringify(unityExport(),null,2)},{name:'save.json',text:JSON.stringify(db)}]]]))},'전체 ZIP으로 내보내기'));
 }
