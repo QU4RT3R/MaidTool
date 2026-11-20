@@ -349,7 +349,10 @@ function render(){
   put($('#nav'),TOOLS.map(([k,l])=>h('button',{class:ui.tool===k?'on':'',onclick:()=>go(k)},l)));
   renderCal(); renderTop(); updateUlBadge();
   const v=$('#view'); v.dataset.sc='view';
-  put(v,ui.tool==='db'?dbView():ui.tool==='coord'?coordView():dialogView());
+  try{ put(v,ui.tool==='db'?dbView():ui.tool==='coord'?coordView():dialogView()); }
+  catch(err){ console.error(err); put(v,h('div',{class:'panel'},h('h3',{},'이 화면을 그리다가 오류가 났어요'),h('p',{class:'errbox'},String(err&&err.message||err)),
+    h('p',{class:'muted'},'데이터는 그대로예요. 다른 탭이나 툴로 옮기고, 이 메시지를 그대로 알려 주세요.'),
+    ui.tool==='db'?h('button',{class:'pri',onclick:()=>{ui.dbTab='normal';render();}},'첫 탭으로 돌아가기'):null)); }
   document.querySelectorAll('[data-sc]').forEach(e=>{ if(keep[e.dataset.sc]){e.scrollTop=keep[e.dataset.sc][0];e.scrollLeft=keep[e.dataset.sc][1];} });
   if(ui.tool==='dialog')pvLoad(true);
 }
@@ -1018,7 +1021,8 @@ function importTalkCSV(which){
     snap(); db[which]=out; touch(); render(); toast(out.length+'행을 불러왔어요'+(bad?' · 날짜ID를 못 찾아 건너뛴 줄 '+bad+'개':''),true); });
 }
 function talkTable(which){
-  const dateOpts=ALLDATES.map(k=>[k,dcode(k)]), gens=[...new Set([...db.visits,...db.lines].map(x=>x.npc).filter(isGen))].sort((a,b)=>genNo(a)-genNo(b)), egs=[...new Set(db.lines.map(x=>x.npc).filter(isEvtGrp))].sort((a,b)=>evtNo(a)-evtNo(b)), npcIds=[...gens,GEN+(Math.max(0,...gens.map(genNo))+1),...talkers().map(n=>n.id),...(isV?[]:[...egs,'Event'+(Math.max(0,...egs.map(evtNo))+1)])], spIds=['player',GEN,...talkers().map(n=>n.id)], isV=which==='visits';
+  const isV=which==='visits';
+  const dateOpts=ALLDATES.map(k=>[k,dcode(k)]), gens=[...new Set([...db.visits,...db.lines].map(x=>x.npc).filter(isGen))].sort((a,b)=>genNo(a)-genNo(b)), egs=[...new Set(db.lines.map(x=>x.npc).filter(isEvtGrp))].sort((a,b)=>evtNo(a)-evtNo(b)), npcIds=[...gens,GEN+(Math.max(0,...gens.map(genNo))+1),...talkers().map(n=>n.id),...(isV?[]:[...egs,'Event'+(Math.max(0,...egs.map(evtNo))+1)])], spIds=['player',GEN,...talkers().map(n=>n.id)];
   let rows=isV?sortedVisits():sortedLines(); const all=rows.length; if(ui.date)rows=rows.filter(r=>r.d===ui.date);
   const del=r=>h('button',{class:'sm ghost',title:'행 삭제',onclick:()=>{snap();db[which].splice(db[which].indexOf(r),1);touch();render();toast('행을 삭제했어요',true);}},'✕');
   const num=r=>{const e=h('input',{type:'number',value:r.order,style:'min-width:60px'});e.addEventListener('input',()=>{r.order=e.value===''?'':+e.value;touch();});e.addEventListener('change',render);return e;};
