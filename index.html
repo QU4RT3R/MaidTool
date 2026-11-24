@@ -77,6 +77,10 @@ main{flex:1;min-width:0;display:flex;flex-direction:column}
 .tabs button.dragging{opacity:.4}
 .tabs button.dropL{box-shadow:inset 3px 0 0 var(--pink2)}
 .tabs button.dropR{box-shadow:inset -3px 0 0 var(--pink2)}
+td.rowh{cursor:grab;color:#9aa0ad;user-select:none;white-space:nowrap;padding:0 8px!important;text-align:left}
+tr.dragging{opacity:.4}
+tr.dropT>td{box-shadow:inset 0 3px 0 var(--pink2)}
+tr.dropB>td{box-shadow:inset 0 -3px 0 var(--pink2)}
 .badge{background:var(--pink2);color:#fff;border-radius:8px;padding:0 6px;margin-left:5px;font-size:11px}
 
 .dlg{display:grid;grid-template-columns:270px minmax(340px,1fr) auto;gap:12px;height:100%}
@@ -554,7 +558,7 @@ function tableView(ti){
       h('button',{class:'sm pk',onclick:()=>{snap();db.tables.splice(ti,1);ui.dbTab='normal';touch();render();toast('표를 삭제했어요',true);}},'표 삭제')),
     h('div',{class:'gridwrap','data-sc':'tbl'},h('table',{class:'grid'},
       h('tr',{},h('th',{},'#'),t.cols.map((c,ci)=>(t.meta[ci]||{}).unlock?h('th',{class:'ulth',style:'padding:4px 8px'},c,h('span',{class:'tag sky',style:'margin-left:4px'},'해금')):h('th',{},h('div',{style:'display:flex;align-items:center'},colIn(ci),(t.meta[ci]||{}).type==='enum'?h('span',{class:'tag sky'},'목록'):null,h('button',{class:'sm ghost',title:'열 설정 (이름 · 값 종류 · 선택 목록)',onclick:()=>colModal(Object.assign({name:t.cols[ci]},t.meta[ci]||{}),o=>{t.cols[ci]=o.name;t.meta[ci]={type:o.type,options:o.options};},()=>delCol(ci))},'⚙'),h('button',{class:'sm ghost',title:'열 삭제',onclick:()=>{snap();delCol(ci);touch();render();toast('열을 삭제했어요',true);}},'✕')))),h('th',{},'')),
-      t.rows.map((r,ri)=>h('tr',{},h('td',{class:'muted',style:'padding:0 6px'},ri+1),t.cols.map((c,ci)=>h('td',{},cell(r,ci))),
+      t.rows.map((r,ri)=>h('tr',rowDrop(t,r,moveIn(t.rows)),rowHandle(t,r,ri+1),t.cols.map((c,ci)=>h('td',{},cell(r,ci))),
         h('td',{},h('button',{class:'sm ghost',title:'행 삭제',onclick:()=>{snap();t.rows.splice(ri,1);touch();render();toast('행을 삭제했어요',true);}},'✕')))))),
     h('div',{class:'row',style:'margin-top:8px'},h('button',{class:'pri sm',onclick:()=>{t.rows.push(t.cols.map(()=>''));touch();render();}},'+ 행 추가'),
       h('button',{class:'sm',onclick:()=>{const ci=t.cols.length;t.cols.push('새 열');t.rows.forEach(r=>r.push(''));touch();render();colModal({name:'새 열'},o=>{t.cols[ci]=o.name;t.meta[ci]={type:o.type,options:o.options};},()=>delCol(ci));}},'+ 열 추가'),
@@ -574,7 +578,16 @@ function newTableModal(){
     [h('button',{onclick:closeModal},'취소'),h('button',{class:'pri',onclick:make},'만들기')]);
   name.focus();
 }
-let dbDrag=null;
+let dbDrag=null, rowDrag=null;
+/* 행 끌어서 순서 바꾸기: 왼쪽 ⠿ 칸을 잡고 다른 행 위에 놓는다 (위쪽 절반 = 앞, 아래쪽 절반 = 뒤) */
+function rowHandle(token,item,label){ return h('td',{class:'rowh',draggable:'true',title:'끌어서 행 순서 바꾸기',
+    ondragstart:e=>{ rowDrag={token,item}; e.dataTransfer.effectAllowed='move'; try{e.dataTransfer.setData('text/plain','row');}catch(x){} e.currentTarget.closest('tr').classList.add('dragging'); },
+    ondragend:()=>{ rowDrag=null; document.querySelectorAll('tr.dragging,tr.dropT,tr.dropB').forEach(r=>r.classList.remove('dragging','dropT','dropB')); }},'⠿',label!=null?h('span',{class:'muted',style:'margin-left:4px'},label):null); }
+function rowDrop(token,item,move){ const after=e=>{const r=e.currentTarget.getBoundingClientRect();return e.clientY>r.top+r.height/2;};
+  return {ondragover:e=>{ if(!rowDrag||rowDrag.token!==token||rowDrag.item===item)return; e.preventDefault(); e.dataTransfer.dropEffect='move'; const a=after(e); e.currentTarget.classList.toggle('dropB',a); e.currentTarget.classList.toggle('dropT',!a); },
+    ondragleave:e=>e.currentTarget.classList.remove('dropT','dropB'),
+    ondrop:e=>{ if(!rowDrag||rowDrag.token!==token||rowDrag.item===item)return; e.preventDefault(); const src=rowDrag.item, a=after(e); rowDrag=null; snap(); move(src,item,a); touch(); render(); }}; }
+const moveIn=arr=>(src,dst,after)=>{ arr.splice(arr.indexOf(src),1); arr.splice(arr.indexOf(dst)+(after?1:0),0,src); };
 function dbTabList(){ // 데이터베이스 탭 목록. 표는 위치(t0, t1…)가 바뀌어도 순서가 유지되도록 고유 키(u:…)로 기억한다
   const items=[...NKL().map(([k,l])=>({k,l,n:db.npcs.filter(n=>(n.kind||'normal')===k).length,go:k})),
     {k:'visits',l:'날짜별 방문자',n:db.visits.length,go:'visits'},{k:'lines',l:'대사',n:db.lines.length,go:'lines'},{k:'events',l:'이벤트 목록',n:db.events.length,go:'events'},
@@ -611,13 +624,13 @@ function dbView(){
     h('div',{class:'panel'},
       h('div',{class:'row',style:'margin-bottom:10px'},h('label',{class:'f'},'표시 이름',inp(db.nlabel,ui.dbTab,{rerender:true,style:'width:170px',ph:NK.find(k=>k[0]===ui.dbTab)[1]})),h('label',{class:'f'},'내보내기 파일 이름',h('span',{},inp(db.nfile,ui.dbTab,{style:'width:200px',ph:NFILE[ui.dbTab]}),' .csv')),
         h('label',{title:'UnlockType · DemoUnlockType 열을 한글 이름 바로 오른쪽에 붙여요 (값은 꺼도 지워지지 않아요)',style:'align-self:flex-end'},h('input',{type:'checkbox',checked:ulOn,onchange:e=>{db.nunlock[ui.dbTab]=e.target.checked;touch();render();}}),' 해금 열')),
-      h('div',{style:'overflow:auto'},h('table',{style:'min-width:'+(820+xc.length*130+(ulOn?380:0))+'px'},h('tr',{},NCOLS.slice(0,3).map(c=>h('th',{},c[1])),
+      h('div',{style:'overflow:auto'},h('table',{style:'min-width:'+(820+xc.length*130+(ulOn?380:0))+'px'},h('tr',{},h('th',{style:'width:28px'},''),NCOLS.slice(0,3).map(c=>h('th',{},c[1])),
           ulOn?UL.map(u=>h('th',{class:'ulth'},u.name,h('span',{class:'tag sky',style:'margin-left:4px'},'해금'))):null,
           NCOLS.slice(3).map(c=>h('th',{},c[1])),
           xc.map(c=>h('th',{},c.name,c.type==='enum'?h('span',{class:'tag sky',style:'margin-left:4px'},'목록'):null,c.fixed?null:h('button',{class:'sm ghost',title:'열 설정 (이름 · 값 종류 · 선택 목록 · 삭제)',onclick:()=>colModal(c,o=>Object.assign(c,o),()=>xc.splice(xc.indexOf(c),1))},'⚙'))),
           h('th',{style:'width:150px'},'분류'),h('th',{style:'width:40px'},'')),
         rows.map(r=>{ const nc=c=>h('td',{style:c[0]==='id'&&dup.has(r.id)?'background:var(--pinkl)':''},inp(r,c[0],{type:c[2]||'text',rerender:c[0]==='id'}));
-          return h('tr',{},NCOLS.slice(0,3).map(nc),
+          return h('tr',rowDrop('npc:'+ui.dbTab,r,moveIn(db.npcs)),rowHandle('npc:'+ui.dbTab,r),NCOLS.slice(0,3).map(nc),
           ulOn?UL.map(u=>h('td',{},typedCell(ulMeta(u),()=>(r.ul||{})[u.name],v=>{(r.ul||(r.ul={}))[u.name]=v;}))):null,
           NCOLS.slice(3).map(nc),
           xc.map(c=>h('td',{},typedCell(c,()=>(r.x||{})[c.key],v=>{(r.x||(r.x={}))[c.key]=v;}))),
